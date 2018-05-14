@@ -150,6 +150,16 @@ type: "tags"
 
 重新执行本地测试，点击Categories和Tags，发现索引建立已经成功。
 
+##5.4 创建About页面
+博客页面上有一个"About"链接，为其创建一个页面，里面做博主的自我介绍。
+
+```shell
+$ hexo new page about
+INFO  Created: ~/hexo-root/source/about/index.md
+$
+$ vim source/about/index.md
+自我介绍
+```
 
 #6. 创建github repository
 
@@ -200,6 +210,9 @@ $ hexo deploy
 * 第三条命令：把第二步生成的静态页面上传到github；
 
 现在，博客就生成了：http://{your-name}.github.io/
+
+
+
 
 
 #10. 创建markdown repository
