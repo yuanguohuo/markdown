@@ -27,7 +27,7 @@ $ mkdir hexo-root
 $ cd hexo-root
 $ hexo init .
 ```
-这里创建了一个空目录hex-root，并进行hexo初始化。后续的操作都在hexo-root目录下执行。
+这里创建了一个空目录hex-root，并进行hexo初始化。后续的操作都在hexo-root目录下执行。
 
 注意：最后一个命令(hexo init .)要求当前目录(hexo-root)是一个空目录。否则，会失败。
 
@@ -40,11 +40,11 @@ _config.yml  node_modules  package-lock.json  package.json  scaffolds  source  t
 
 #4. 本地测试
 
-在本地起hexo server
+在本地起hexo server
 ```shell
 $ hexo server
 ```
-然后，在浏览器上可以测试初始化是否成功：
+然后，在浏览器上可以测试初始化是否成功：
 http://localhost:4000/
 
 这时候应该能看见初始化自带的一篇博客：hello-world
@@ -59,7 +59,7 @@ $ ls themes/
 landscape
 ```
 
-下载next主题：
+下载next主题：
 ```shell
 $ git clone https://github.com/idhyt/hexo-theme-next.git themes/next
 $
@@ -82,15 +82,15 @@ scheme: Mist
 ```
 
 
-重新本地测试（见第4节），发现已经变为简约的next主题了。
+重新本地测试（见第4节），发现已经变为简约的next主题了。
 
 
 ##5.2 设置new_post_name
-当我们使用命令：
+当我们使用命令：
 ```
 hexo new {title}
 ```
-创建一篇新博客的时候，hexo会为我们生成一个{title}.md文件。为了日后方便看博客的创建时间，我们希望.md文件名中带上当前日期。为此，修改_config.yml:
+创建一篇新博客的时候，hexo会为我们生成一个{title}.md文件。为了日后方便看博客的创建时间，我们希望.md文件名中带上当前日期。为此，修改_config.yml:
 ```shell
 $ vim _config.yml
 #new_post_name: :title.md # File name of new posts
@@ -104,9 +104,9 @@ hello-world.md  testpage-2018-05-12.md
 
 ```
 
-##5.3 创建categories,tags和about页面
+##5.3 创建categories,tags和about页面
 
-把categories, tags和about都打开。这样，博客主页上就会显示相应的按钮。
+把categories, tags和about都打开。这样，博客主页上就会显示相应的按钮。
 
 ```shell
 $ vim themes/next/_config.yml  
@@ -119,13 +119,13 @@ menu:
 ```
 
 
-现在执行本地测试（见第4节），点击主页上方的Categories,Tags和About按钮时，会得到错误：
+现在执行本地测试（见第4节），点击主页上方的Categories,Tags和About按钮时，会得到错误：
 
 * Cannot GET /categories/
 * Cannot GET /tags/
 * Cannot GET /about/
 
-这是因为source/下没有categories, tags和about信息。创建它们：
+这是因为source/下没有categories, tags和about信息。创建它们：
 ```shell
 
 $ hexo new page about
@@ -141,9 +141,9 @@ $ hexo new page tags
 INFO  Created: ~/hexo-root/source/tags/index.md
 ```
 
-可见，在source/下创建了三个目录：categories, tags和about，并且各创建了一个index.md文件。
+可见，在source/下创建了三个目录：categories, tags和about，并且各创建了一个index.md文件。
 
-重新执行本地测试，发现点击Categories, Tags和About时不再报错了。现在我们尝试在testpage-2018-05-12.md中加入category和tag，看看能不能成功建立categories和tags索引：
+重新执行本地测试，发现点击Categories, Tags和About时不再报错了。现在我们尝试在testpage-2018-05-12.md中加入category和tag，看看能不能成功建立categories和tags索引：
 ```shell
 $ vim source/_posts/testpage-2018-05-12.md
 ---
@@ -153,7 +153,7 @@ tags: [filesystem,ext4]
 categories: linux
 ---
 ```
-重新执行本地测试，点击Categories和Tags，发现里面都是空的。索引建立失败。解决很简单：
+重新执行本地测试，点击Categories和Tags，发现里面都是空的。索引建立失败。解决：
 * 在source/categories/index.md中加入type: "categories
 
 ```shell
@@ -180,7 +180,7 @@ type: "tags"
 
 
 
-##5.4 站内搜索功能
+##5.4 站内搜索功能
 
 
 ```shell
@@ -219,7 +219,7 @@ local_search:
 注意：repository名一定要为github的名字。
 
 
-#7. 拷贝public key到github
+#7. 拷贝public key到github
 
 若还没有生成key pair，请先生成。然后：
 ```shell
@@ -229,7 +229,7 @@ $ cat ~/.ssh/id_rsa.pub
 到github上，点击：右上的头像 -> Settings -> SSH and GPG keys -> New SSH key; 填写Title(名称自取)和Key (粘贴前面拷贝的id_rsa.pub的内容)。
 
 
-#8. 配置deploy
+#8. 配置deploy
 
 ```shell
 $ vim _config.yml
@@ -240,13 +240,13 @@ deploy:
   branch: master
 ```
 
-#9. deploy
+#9. deploy
 
 第一次deploy，需要先安装hexo-deployer-git：
 ```shell
 $ npm install hexo-deployer-git --save
 ```
-只第一次deploy之前执行！
+只第一次deploy之前执行！
 
 下面就是deploy了：
 
@@ -257,7 +257,7 @@ $ hexo deploy
 ```
 
 * 第一条命令：删除本地生成的静态页面；
-* 第二条命令：根据source/\_posts下面的.md文件，以及主题等，重新生成静态页面；
+* 第二条命令：根据source/\_posts下面的.md文件，以及主题等，重新生成静态页面；
 * 第三条命令：把第二步生成的静态页面上传到github；
 
 现在，博客就生成了：http://{your-name}.github.io/
@@ -266,5 +266,5 @@ $ hexo deploy
 
 
 
-#10. 创建markdown repository
-到此为止，博客就搭建起来了。以后写博客，就是创建.md文件。为了保存曾经的博客(.md文件)，我另外创建一个github repository。通过这个repository，在公司和家里的不同电脑上，都可以写博客了。最后，在配置了hexo的电脑发布。
+#10. 创建markdown repository
+到此为止，博客就搭建起来了。以后写博客，就是创建.md文件。为了保存曾经的博客(.md文件)，我另外创建一个github repository。通过这个repository，在公司和家里的不同电脑上，都可以写博客了。最后，在配置了hexo的电脑上发布。
