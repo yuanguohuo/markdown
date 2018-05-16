@@ -75,7 +75,15 @@ $ vim _config.yml
 theme: next
 ```
 
+把next主题的scheme改为Mist（纯属个人喜好）
+```shell
+$ vim themes/next/_config.yml  
+scheme: Mist
+```
+
+
 重新本地测试（见第4节），发现已经变为简约的next主题了。
+
 
 ##5.2 设置new_post_name
 当我们使用命令：
@@ -85,7 +93,6 @@ hexo new {title}
 创建一篇新博客的时候，hexo会为我们生成一个{title}.md文件。为了日后方便看博客的创建时间，我们希望.md文件名中带上当前日期。为此，修改_config.yml:
 ```shell
 $ vim _config.yml
-......
 #new_post_name: :title.md # File name of new posts
 new_post_name: :title-:year-:month-:day.md # File name of new posts
 $
@@ -97,24 +104,46 @@ hello-world.md  testpage-2018-05-12.md
 
 ```
 
-##5.3 设置categories和tags
+##5.3 创建categories,tags和about页面
 
-现在执行本地测试（见第4节），点击主页上方的Categories和Tags，会得到错误：
+把categories, tags和about都打开。这样，博客主页上就会显示相应的按钮。
+
+```shell
+$ vim themes/next/_config.yml  
+menu:
+   home: / || home
+   about: /about/ || user
+   tags: /tags/ || tags
+   categories: /categories/ || th
+   archives: /archives/ || archive  
+```
+
+
+现在执行本地测试（见第4节），点击主页上方的Categories,Tags和About按钮时，会得到错误：
 
 * Cannot GET /categories/
 * Cannot GET /tags/
+* Cannot GET /about/
 
-这是因为source/下没有categories和tags信息。创建它们：
+这是因为source/下没有categories, tags和about信息。创建它们：
 ```shell
+
+$ hexo new page about
+INFO  Created: ~/hexo-root/source/about/index.md
+$
+$ vim source/about/index.md
+自我介绍
+$
 $ hexo new page categories
 INFO  Created: ~/hexo-root/source/categories/index.md
 $
 $ hexo new page tags
 INFO  Created: ~/hexo-root/source/tags/index.md
 ```
-可见，在source/下创建了两个目录：categories和tags，并且各创建了一个index.md文件。
 
-重新执行本地测试，点击Categories和Tags时，已经不报错了。我们尝试在testpage-2018-05-12.md中加入category和tag，看看能不能成功建立索引：
+可见，在source/下创建了三个目录：categories, tags和about，并且各创建了一个index.md文件。
+
+重新执行本地测试，发现点击Categories, Tags和About时不再报错了。现在我们尝试在testpage-2018-05-12.md中加入category和tag，看看能不能成功建立categories和tags索引：
 ```shell
 $ vim source/_posts/testpage-2018-05-12.md
 ---
@@ -147,19 +176,41 @@ type: "tags"
 ---
 ```
 
-
 重新执行本地测试，点击Categories和Tags，发现索引建立已经成功。
 
-##5.4 创建About页面
-博客页面上有一个"About"链接，为其创建一个页面，里面做博主的自我介绍。
+
+
+##5.4 站内搜索功能
+
 
 ```shell
-$ hexo new page about
-INFO  Created: ~/hexo-root/source/about/index.md
+$ npm install hexo-generator-search --save
+$ npm install hexo-generator-searchdb --save
 $
-$ vim source/about/index.md
-自我介绍
+$ vim _config.xml
+search:
+  path: search.xml
+  field: post
+  format: html
+  limit: 10000
+
+$
+$ vim themes/next/_config.yml
+local_search:
+  enable: true
+  # if auto, trigger search by changing input
+  # if manual, trigger search by pressing enter key or search button
+  trigger: auto
+  # show top n results per article, show all results by setting to -1
+  top_n_per_article: 1
+  # unescape html strings to the readable one
+  unescape: false
 ```
+
+
+
+
+
 
 #6. 创建github repository
 
