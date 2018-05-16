@@ -61,7 +61,7 @@ landscape
 
 下载next主题：
 ```shell
-$ git clone https://github.com/idhyt/hexo-theme-next.git themes/next
+$ git clone https://github.com/theme-next/hexo-theme-next themes/next
 $
 $ ls themes/
 landscape  next
