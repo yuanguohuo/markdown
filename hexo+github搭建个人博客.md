@@ -104,9 +104,8 @@ hello-world.md  testpage-2018-05-12.md
 
 ```
 
-##5.3 创建categories,tags和about页面
-
-把categories, tags和about都打开。这样，博客主页上就会显示相应的按钮。
+##5.3 菜单栏
+默认情况下，菜单栏中只有Home和Archives两项。把categories, tags和about都打开，这样，菜单栏就会显示相应的菜单项了。
 
 ```shell
 $ vim themes/next/_config.yml  
@@ -178,9 +177,37 @@ type: "tags"
 
 重新执行本地测试，点击Categories和Tags，发现索引建立已经成功。
 
+##5.4 基本信息
+ 
+```shell
+$ vim _config.yml
+title: <Your-name>的博客 
+description: 简短自我/博客描述
+author: <Your-name> 
+```
+
+##5.5 头像设置
+
+把头像（例如me.jpg）放到themes/next/source/images/目录下，然后修改next的配置文件：
+
+```shell
+$ vim themes/next/_config.yml
+avatar:
+  url: /images/me.jpg
+```
 
 
-##5.4 站内搜索功能
+##5.6 社交链接
+
+```shell
+$ vim themes/next/_config.yml
+social:
+  GitHub: https://github.com/<your-name> || github
+  E-Mail: mailto:<your-email-address> || envelope
+````
+
+
+##5.7 站内搜索功能
 
 
 ```shell
@@ -208,9 +235,31 @@ local_search:
 ```
 
 
+##5.8 生成摘要
 
+当点击“Home”的时候，会显示博文列表。通过配置，可以同时显示一个摘要。有两种方式生成摘要：
 
+###5.8.1 自动生成
+这种方式比较简单粗暴，就是认为你博文的“前N个字”就是摘要，所有博文都一样。例如，前300字自动作为摘要：
+```shell
+$ vim themes/next/_config.yml
+auto_excerpt:
+  enable: true
+  length: 300
+```
 
+###5.8.2 博主自定义摘要
+自动生成摘要的方式虽然简单，但不精确。博主可以为每篇博文精确定义摘要，方式是：
+
+```shell
+vim blog-title-{year}-{month}-{day}.md
+摘要部分
+<!-- more -->
+正文部分
+```
+也就是通过<!-- more -->将摘要和正文分开。
+
+**注意：显然，推荐使用自定义摘要。但是，可以把自动生成摘要打开，这样，若博客有自定义摘要，则使用自定义摘要；若没有，则自动生成。**
 
 #6. 创建github repository
 
