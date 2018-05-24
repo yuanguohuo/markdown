@@ -1,5 +1,5 @@
 ---
-title: hexo+github搭建个人博客
+title: build-blog-with-hexo
 date: 2018-05-23 15:40:32
 tags: [hexo]
 categories: hexo
@@ -39,7 +39,7 @@ $ mkdir hexo-root
 $ cd hexo-root
 $ hexo init .
 ```
-这里创建了一个空目录hex-root，并进行hexo初始化。后续的操作都在hexo-root目录下执行。
+这里创建了一个空目录hex-root，并进行hexo初始化。**后续的操作都在hexo-root目录下执行**。
 
 注意：最后一个命令(hexo init .)要求当前目录(hexo-root)是一个空目录。否则，会失败。
 
@@ -87,15 +87,19 @@ $ vim _config.yml
 theme: next
 ```
 
-把next主题的scheme改为Mist（纯属个人喜好）
+把next主题的scheme设置为Mist(纯属个人喜好)
 ```shell
 $ vim themes/next/_config.yml  
 scheme: Mist
 ```
 
+把代码高亮设置为night eighties(纯属个人喜好)
+```shell
+$ vim themes/next/_config.yml
+highlight_theme: night eighties
+```
 
 重新本地测试，发现已经变为简约的next主题了。
-
 
 ## 设置new_post_name
 当我们使用命令：
@@ -191,14 +195,22 @@ menu:
   message: 留言
   about: 关于
   search: 搜索
+sidebar:
+  overview: 本站概览
+  toc: 文章目录
 post:
   posted: 发表于
+  edited: 更新于
   in: 所属分类
-  edited: 最近更新
-  views: 阅读量
+  views: 阅读次数
   comments_count: 评论数
   read_more: 阅读全文
-$
+  sticky: 置顶
+  toc_empty: 此文章未包含目录
+reward:
+  wechatpay: 微信支付
+  alipay: 支付宝
+
 $ vim _config.yml
 language: zh-Hans
 ```
@@ -324,7 +336,9 @@ valine:
 
 创建git repository:  https://github.com/<your-name>/<your-name>.github.io
 
-注意：repository名一定要为github的名字。
+注意：
+* repository名一定要为github的名字。
+* 把"Initialize this repository with a README"勾选上。
 
 # 拷贝public key到github
 
