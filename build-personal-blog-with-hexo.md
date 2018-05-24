@@ -1,5 +1,5 @@
 ---
-title: build-blog-with-hexo
+title: 基于hexo+github搭建个人博客 
 date: 2018-05-23 15:40:32
 tags: [hexo]
 categories: hexo
