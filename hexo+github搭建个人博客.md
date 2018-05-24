@@ -116,7 +116,7 @@ hello-world.md  testpage-2018-05-12.md
 ```
 
 ## 菜单栏
-默认情况下，菜单栏中只有Home和Archives两项。把categories, tags和about都打开，这样，菜单栏就会显示相应的菜单项了。
+默认情况下，菜单栏中只有Home和Archives两项。把categories, tags和about都打开，这样，菜单栏就会显示相应的菜单项了。
 
 ```shell
 $ vim themes/next/_config.yml  
