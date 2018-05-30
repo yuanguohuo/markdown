@@ -210,6 +210,24 @@ post:
 reward:
   wechatpay: 微信支付
   alipay: 支付宝
+state:
+  posts: 日志
+  pages: 页面
+  tags: 标签
+  categories: 分类
+counter:
+  tag_cloud:
+    zero: 暂无标签
+    one: 目前共计 1 个标签
+    other: "目前共计 %d 个标签"
+  categories:
+    zero: 暂无分类
+    one: 目前共计 1 个分类
+    other: "目前共计 %d 个分类"
+  archive_posts:
+    zero: 暂无日志。
+    one: 目前共计 1 篇日志。
+    other: "目前共计 %d 篇日志。"
 
 $ vim _config.yml
 language: zh-Hans
