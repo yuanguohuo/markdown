@@ -20,148 +20,7 @@ int bar(const int& a); //可以匹配右值。
 
 # 右值引用
 
-有关右值引用(rvalue reference)的产生逻辑，见[C++11的std::move](http://www.yuanguohuo.com/2018/05/24/cpp11-std-move/)，这里我们只关注右值引用本身。下文测试用到的Foo类，定义如下：
-
-```cpp
-#include <iostream>
-#include <string.h>
-
-using namespace std;
-
-class Foo
-{
-  private:
-    char * data;
-  public:
-    virtual ~Foo()
-    {
-      std::cout << "~Foo()    " 
-                << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data) << std::endl;
-
-      if(data != NULL)
-      {
-        delete []data;
-        data = NULL;
-      }
-    }
-
-    Foo(const char * s) : data(NULL)
-    {
-      std::cout << "Foo(const char * s)    ";
-
-      if(s)
-      {
-        int len = strlen(s);
-        data = new char[len+1];
-        memcpy(data, s, len+1);
-      }
-
-      std::cout << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data) << std::endl;
-    }
-
-    Foo(const Foo & other) : data(NULL)
-    {
-      std::cout << "Foo(const Foo & other)    " 
-                << (void*)&other << "/" 
-                << (void*)other.data << "/" 
-                << (other.data==NULL?"NULL":other.data) << "-->";
-
-
-      if(other.data)
-      {
-        int len = strlen(other.data);
-        data = new char[len+1];
-        memcpy(data, other.data, len+1);
-      }
-
-      std::cout << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data)<< std::endl;
-    }
-
-    Foo& operator= (const Foo & other)
-    {
-      std::cout << "Foo& operator= (const Foo & other)    " 
-                << (void*)&other << "/" 
-                << (void*)other.data << "/" 
-                << (other.data==NULL?"NULL":other.data) << "==>";
-
-      if(this != &other)
-      {
-        if(NULL != data)
-        {
-          delete []data;
-          data = NULL;
-        }
-
-        if(NULL != other.data)
-        {
-          int len = strlen(other.data);
-          data = new char[len+1];
-          memcpy(data, other.data, len+1);
-        }
-      }
-
-      std::cout << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data) << std::endl;
-
-      return *this;
-    }
-
-    Foo(Foo && other) noexcept
-    {
-      std::cout << "Foo(Foo && other)    " 
-                << (void*)&other << "/" 
-                << (void*)other.data << "/" 
-                << (other.data==NULL?"NULL":other.data) << "-->";
-
-      data = other.data;
-      other.data = NULL;
-
-      std::cout << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data) << std::endl;
-    }
-
-    Foo& operator= (Foo && other) noexcept
-    {
-      std::cout << "Foo& operator= (Foo && other)    " 
-                << (void*)&other << "/" 
-                << (void*)other.data 
-                << "/" << (other.data==NULL?"NULL":other.data) << "==>";
-
-      if(this != &other)
-      {
-        if(data != NULL)
-        {
-          delete []data;
-          data = NULL;
-        }
-
-        data = other.data;
-        other.data = NULL;
-      }
-
-      std::cout << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data) << std::endl;
-
-      return *this;
-    }
-
-    void dump()
-    {
-      std::cout << (void*)this << "/" 
-                << (void*)data << "/" 
-                << (data==NULL?"NULL":data) << std::endl;
-    }
-};
-```
+有关右值引用(rvalue reference)的产生逻辑，见[C++11的std::move](http://www.yuanguohuo.com/2018/05/24/cpp11-std-move/)，这里我们只关注右值引用本身。下文的例子都基于一个测试class Foo，它的定义在文末"测试用到的Foo类"一节。
 
 ## 右值引用是一种新的类型
 
@@ -272,13 +131,13 @@ int main()
 从上面的例子，总结一下右值引用如何初始化：
 
 * r1：引用字面量；
-* r2：引用临时变量；
-* r3：引用临时变量；
+* r2：引用临时变量(函数返回的)；
+* r3：引用临时变量(匿名变量)；
 * r4：引用经std::move强制的左值；
 
 ## 有名是左值无名是右值
 
-我们把上一节的例子加以扩充:
+我们把上一节的例子加以扩充(注意，本例需要认真看一下class Foo的实现，见文末"测试用到的Foo类"一节):
 
 ```cpp
 Foo func2()
@@ -348,7 +207,7 @@ Foo& operator= (const Foo & other)    0x7ffc4a430350/0x21b0010/EEE==>0x7ffc4a430
 * 输出第12行：f3被赋值到r3。通过赋值函数(非移动赋值)；
 * 输出第13行：析构f3。它的data没有被move。
 * 输出第14行：析构main中的局部变量f；
-* 输出第15行：析构r3引用的临时对象；
+* 输出第15行：析构r3引用的临时对象(匿名变量)；
 * 输出第16行：析构r2引用的临时对象(函数返回的)；
 
 
@@ -518,6 +377,149 @@ typename remove_reference<T>::type&& move(T&& t)
 * std::move(g)是右值(假设g是Foo类型的左值)，所以可以赋给一个右值引用类型的变量；
 * bar()是右值(假设bar的原型是Foo&& bar();)，这种情形和std::move()一样；
 * static_cast<Foo&&>(g)是右值(假设g是Foo类型的左值)，这种情形和std::move()一样；
+
+# 测试用到的Foo类
+
+```cpp
+#include <iostream>
+#include <string.h>
+
+using namespace std;
+
+class Foo
+{
+  private:
+    char * data;
+  public:
+    virtual ~Foo()
+    {
+      std::cout << "~Foo()    " 
+                << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data) << std::endl;
+
+      if(data != NULL)
+      {
+        delete []data;
+        data = NULL;
+      }
+    }
+
+    Foo(const char * s) : data(NULL)
+    {
+      std::cout << "Foo(const char * s)    ";
+
+      if(s)
+      {
+        int len = strlen(s);
+        data = new char[len+1];
+        memcpy(data, s, len+1);
+      }
+
+      std::cout << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data) << std::endl;
+    }
+
+    Foo(const Foo & other) : data(NULL)
+    {
+      std::cout << "Foo(const Foo & other)    " 
+                << (void*)&other << "/" 
+                << (void*)other.data << "/" 
+                << (other.data==NULL?"NULL":other.data) << "-->";
+
+
+      if(other.data)
+      {
+        int len = strlen(other.data);
+        data = new char[len+1];
+        memcpy(data, other.data, len+1);
+      }
+
+      std::cout << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data)<< std::endl;
+    }
+
+    Foo& operator= (const Foo & other)
+    {
+      std::cout << "Foo& operator= (const Foo & other)    " 
+                << (void*)&other << "/" 
+                << (void*)other.data << "/" 
+                << (other.data==NULL?"NULL":other.data) << "==>";
+
+      if(this != &other)
+      {
+        if(NULL != data)
+        {
+          delete []data;
+          data = NULL;
+        }
+
+        if(NULL != other.data)
+        {
+          int len = strlen(other.data);
+          data = new char[len+1];
+          memcpy(data, other.data, len+1);
+        }
+      }
+
+      std::cout << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data) << std::endl;
+
+      return *this;
+    }
+
+    Foo(Foo && other) noexcept
+    {
+      std::cout << "Foo(Foo && other)    " 
+                << (void*)&other << "/" 
+                << (void*)other.data << "/" 
+                << (other.data==NULL?"NULL":other.data) << "-->";
+
+      data = other.data;
+      other.data = NULL;
+
+      std::cout << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data) << std::endl;
+    }
+
+    Foo& operator= (Foo && other) noexcept
+    {
+      std::cout << "Foo& operator= (Foo && other)    " 
+                << (void*)&other << "/" 
+                << (void*)other.data 
+                << "/" << (other.data==NULL?"NULL":other.data) << "==>";
+
+      if(this != &other)
+      {
+        if(data != NULL)
+        {
+          delete []data;
+          data = NULL;
+        }
+
+        data = other.data;
+        other.data = NULL;
+      }
+
+      std::cout << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data) << std::endl;
+
+      return *this;
+    }
+
+    void dump()
+    {
+      std::cout << (void*)this << "/" 
+                << (void*)data << "/" 
+                << (data==NULL?"NULL":data) << std::endl;
+    }
+};
+```
 
 # 小结
 
