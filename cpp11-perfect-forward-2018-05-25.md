@@ -46,8 +46,8 @@ shared_ptr<T> factory(Arg& arg)
 `factory`的参数是个引用，因此额外的拷贝是没有了。但是`arg`是一个左值引用，它不能匹配右值，这样的调用无法通过编译：
 
 ```cpp
-factory<X>(hoo()); // error if hoo returns by value
-factory<X>(41); // error
+factory<X>(hoo()); // 若hoo返回的不是引用而是值，则找不到匹配的函数，出错
+factory<X>(41);    // 找不到匹配的函数，出错
 ```
 
 ## 尝试3 (1.3)
@@ -169,7 +169,7 @@ X& std::forward(X& a) noexcept
 } 
 ```
 
-可以看出：当左值`arg`引用的是左值时，传递给`new T()`的是被引用的左值(被引用的左值再经过`static_cast<TX&>`得到的还是左值引用)。
+可以看出：当左值`arg`引用的是左值时，传递给`new T()`的是被引用的左值(被引用的左值再经过`static_cast<X&>`得到的还是左值引用)。
 
 ** forwad右值：**
 
@@ -258,7 +258,7 @@ v.push_back(Foo("123"));
 看来问题有了改善，因为移动构拷贝比完整拷贝代价要小。但，`emplace`效果更好。
 
 
-## 原地构造 (3.2)
+## emplace实现原地构造 (3.2)
 
 从功能上看，`emplace`和我们前文`factory`工厂函数十分相似：给它参数，它给你构造对象，利用完美转发，中间不增加额外的参数的拷贝，就像你直接构造对象一样。但更重要的一点是，**它在容器内部原地构造**。总结来说：
 
@@ -272,7 +272,7 @@ template< class... Args >
 void emplace_back(Args&&... args);
 ```
 
-和前文`factory`不同的是，`emplace_back`的参数个数是变化的，不过没关系，把它理解成*N*个通用引用就行了。例如：
+和前文`factory`不同的是，`emplace_back`的参数个数是变化的，不过没关系，把它理解成*N*个通用引用就行了。
 
 ```cpp
 class Bar
@@ -289,7 +289,7 @@ v.emplace_back(X(),Y());
 
 问：emplace_back的*N*个参数是什么？
 
-答：是`vector::value_type`的构造函数的参数列表，在上例中，就是`Bar::Bar()`的参数。注意，你不要去调`vector::value_type`的构造函数，而只需要传入参数列表即可，`emplace_back`会帮我们调用。见下文emplace的错误用法。
+答：是`vector::value_type`的构造函数的参数列表，在上例中，就是`Bar::Bar()`的参数列表。注意，你不要去调`vector::value_type`的构造函数，而只需要传入参数列表即可，`emplace_back`会帮我们调用。见下文emplace的错误用法。
 
 ## emplace的错误用法 (3.3)
 
