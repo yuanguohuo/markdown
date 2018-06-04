@@ -9,14 +9,14 @@ categories: hexo
 
 <!-- more -->
 
-# 安装依赖
+# 安装依赖 (1)
 
-## 安装git
+## 安装git (1.1)
 ```shell
 $ brew install git
 ```
 
-## 安装node.js
+## 安装node.js (1.2)
 ```shell
 $ wget -qO- https://raw.github.com/creationix/nvm/master/install.sh | sh
 ```
@@ -26,14 +26,14 @@ $ wget -qO- https://raw.github.com/creationix/nvm/master/install.sh | sh
 $ nvm install stable
 ```
 
-# 安装hexo
+# 安装hexo (2)
 ```
 $ npm install -g hexo-cli
 $ npm install hexo --save
 
 ```
 
-# 初始化
+# 初始化 (3)
 ```shell
 $ mkdir hexo-root
 $ cd hexo-root
@@ -50,7 +50,7 @@ $ ls
 _config.yml  node_modules  package-lock.json  package.json  scaffolds  source  themes
 ```
 
-# 本地测试
+# 本地测试 (4)
 
 在本地起hexo server
 ```shell
@@ -65,8 +65,8 @@ http://localhost:4000/
 
 测试完成后，ctrl+C停止hexo server。
 
-# 设置
-## 设置主题为next
+# 设置 (5)
+## 设置主题为next (5.1)
 初始化后，默认自带了一个landscape主题：
 ```shell
 $ ls themes/
@@ -101,7 +101,7 @@ highlight_theme: night eighties
 
 重新本地测试，发现已经变为简约的next主题了。
 
-## 设置new_post_name
+## 设置new_post_name (5.2)
 当我们使用命令：
 ```
 hexo new {title}
@@ -119,7 +119,7 @@ hello-world.md  testpage-2018-05-12.md
 
 ```
 
-## 菜单栏
+## 菜单栏 (5.3)
 默认情况下，菜单栏中只有Home和Archives两项。把categories, tags和about都打开，这样，菜单栏就会显示相应的菜单项了。
 
 ```shell
@@ -184,7 +184,7 @@ type: "tags"
 
 重新执行本地测试，点击Categories和Tags，发现索引建立已经成功。
 
-## 配置中文
+## 配置中文 (5.4)
 ```shell
 $ vim themes/next/languages/zh-Hans.yml
 menu:
@@ -233,7 +233,7 @@ $ vim _config.yml
 language: zh-Hans
 ```
 
-## 基本信息
+## 基本信息 (5.5)
 
 ```shell
 $ vim _config.yml
@@ -242,7 +242,7 @@ description: 简短自我/博客描述
 author: <Your-name>
 ```
 
-## 头像设置
+## 头像设置 (5.6)
 
 把头像（例如me.jpg）放到themes/next/source/images/目录下，然后修改next的配置文件：
 
@@ -252,7 +252,7 @@ avatar:
   url: /images/me.jpg
 ```
 
-## 打赏
+## 打赏 (5.7)
 
 把微信和支付宝的收款二维码图片例如wechatpay.jpg和alipay.jpg）放到themes/next/source/images/目录下，然后修改next的配置文件：
 
@@ -263,7 +263,7 @@ wechatpay: /images/wechatpay.jpg
 alipay: /images/alipay.jpg
 ```
 
-## 社交链接
+## 社交链接 (5.8)
 ```shell
 $ vim themes/next/_config.yml
 social:
@@ -271,7 +271,7 @@ social:
   E-Mail: mailto:<your-email-address> || envelope
 ```
 
-## 站内搜索功能
+## 站内搜索功能 (5.9)
 ```shell
 $ npm install hexo-generator-search --save
 $ npm install hexo-generator-searchdb --save
@@ -292,11 +292,11 @@ local_search:
 ```
 
 
-## 生成摘要
+## 生成摘要 (5.10)
 
 当点击“Home”的时候，会显示博文列表。通过配置，可以同时显示一个摘要。有两种方式生成摘要：
 
-### 自动生成
+**自动生成：**
 这种方式比较简单粗暴，就是认为你博文的“前N个字”就是摘要，所有博文都一样。例如，前300字自动作为摘要：
 ```shell
 $ vim themes/next/_config.yml
@@ -305,7 +305,7 @@ auto_excerpt:
   length: 300
 ```
 
-### 自定义
+**自定义：**
 自动生成摘要的方式虽然简单，但不精确。博主可以为每篇博文精确定义摘要，方式是：
 
 ```shell
@@ -318,9 +318,9 @@ vim blog-title-{year}-{month}-{day}.md
 
 **注意：显然，推荐使用自定义摘要。但是，可以把自动生成摘要打开，这样，若博客有自定义摘要，则使用自定义摘要；若没有，则自动生成。**
 
-## leancloud访问量统计和评论功能
+## leancloud访问量统计和评论功能 (5.11)
 
-### Leancloud准备
+### Leancloud准备 (5.11.1)
 
 * 登录https://leancloud.cn/并注册
 * 创建应用: 访问控制台 --> 创建应用 --> 填入新应用名称(自取) --> 创建
@@ -329,11 +329,11 @@ vim blog-title-{year}-{month}-{day}.md
 注意：Comment已经存在，所以我们没有创建Comment；
 
 
-### 获取AppID和AppKey
+### 获取AppID和AppKey (5.11.2)
 
 选择刚创建的应用，设置 --> 应用Key，记下里面的"AppID"和"AppKey"。
 
-### 配置next主题
+### 配置next主题 (5.11.3)
 
 ```shell
 $ vim themes/next/_config.yml
@@ -350,7 +350,7 @@ valine:
 ```
 
 
-# 创建github repository
+# 创建github repository (6)
 
 创建git repository:  https://github.com/<your-name>/<your-name>.github.io
 
@@ -358,7 +358,7 @@ valine:
 * repository名一定要为github的名字。
 * 把"Initialize this repository with a README"勾选上。
 
-# 拷贝public key到github
+# 拷贝public key到github (7)
 
 若还没有生成key pair，请先生成。然后：
 ```shell
@@ -368,7 +368,7 @@ $ cat ~/.ssh/id_rsa.pub
 到github上，点击：右上的头像 -> Settings -> SSH and GPG keys -> New SSH key; 填写Title(名称自取)和Key (粘贴前面拷贝的id_rsa.pub的内容)。
 
 
-# 配置deploy
+# 配置deploy (8)
 
 ```shell
 $ vim _config.yml
@@ -378,7 +378,7 @@ deploy:
   branch: master
 ```
 
-# deploy
+# deploy (9)
 
 第一次deploy，需要先安装hexo-deployer-git：
 ```shell
@@ -400,15 +400,15 @@ $ hexo deploy
 
 现在，博客就生成了：http://{your-name}.github.io/
 
-# 创建markdown repository
+# 创建markdown repository (10)
 到此为止，博客就搭建起来了。以后写博客，就是创建.md文件。为了保存曾经的博客(.md文件)，我另外创建一个github repository。通过这个repository，在公司和家里的不同电脑上，都可以写博客了。最后，在配置了hexo的电脑上发布。
 
 
-# 常见错误
+# 常见错误 (11)
 博文.md文件中除了开头部分，若包含"---"，则很容易出一些奇怪的YAMLException，并且报错的位置可能相去甚远，很难定位。例如：
 * YAMLException: end of the stream or a document separator is expected at line x, column y
 * YAMLException: unidentified alias at line x, column y
 * YAMLException: name of an alias node must contain at least one character at line x, column y
 
-# 小结
+# 小结 (12)
 之前使用CSDN，页面不够漂亮，也不能做一些个性化的设置，所以计划搭一个自己的博客，今天终于得以实现。第一次搭建博客，并且对前端网站不熟悉，踩了不少坑，所以本文记下这个过程，作为开篇。

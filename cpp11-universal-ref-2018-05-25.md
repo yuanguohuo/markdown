@@ -15,9 +15,9 @@ categories: c++
 
 ```cpp
 template <typename T>
-typename remove_reference<T>::type&& move(T&& t)
+typename remove_reference<T>::type&& move(T&& t) noexcept
 {
-    return static_cast<typename remove_reference<T>::type&&>(t);
+  return static_cast<typename remove_reference<T>::type&&>(t);
 }
 ```
 
@@ -157,7 +157,7 @@ void func(std::vector<S>&& p);
 
 如果它引用的是左值(通过左值初始化的)，我们当然不想把它当做右值处理；如果它引用的是右值(通过右值初始化的)，我们通常要利用它的右值的特点的(否则，赋给它右值干什么呢？)。你拿到一个通用引用类型的左值，它引用的可能是左值，也可能是右值，你不清楚(例如，你在写一个摸板函数，它的参数是通用引用，你当然不知道调用者传进左值还是右值)，但你还想保留它左值或右值特性，怎么办呢？见[C++11中的完美转发](http://www.yuanguohuo.com/2018/05/25/cpp11-perfect-forward/)。
 
-# 通用引用产生自引用折叠 (4)
+# 类型推导和引用折叠 (4)
 
 ## 类型推导规则 (4.1)
 
@@ -276,9 +276,74 @@ void func(int& && p);
 * 例3：`int& &`和`int&& &`都折叠成`int&`，就是说LVRefType最终的类型是`int&`；这么定义是正确的：无论取代`T`的是不是引用，是左值引用还是右值引用，最终`LVRefType`都是左值引用类型；
 * 例4：`int& && p`被折叠成`int& p`；
 
-总之，**正是因为引用折叠，`T&&`最终可能变成左值引用，也可能变成右值引用。换句话说，正式因为引用折叠，才产生了通用引用。**
+可见，**类型推导和引用折叠在通用引用特性上扮演着重要角色。编译器允许`T&&`匹配左值和右值，但是，经过类型推导和引用折叠，`T&&`才最终可能变成左值引用，也可能变成右值引用。** 
 
-## 引用剥除 (4.5)
+## std::move的工作原理 (4.5)
+
+回头看`std::move`的实现，你发现，它的工作原理，不过是类型推导和引用折叠的另一个例子：
+
+```cpp
+template <typename T>
+typename remove_reference<T>::type&& move(T&& t) noexcept
+{
+  return static_cast<typename remove_reference<T>::type&&>(t);
+}
+```
+
+**move左值：**
+
+```cpp
+Foo f;
+std::move(f);
+```
+
+根据类型推导规则，`std::move`的类型参数`T`的推导结果是`Foo&`，那么`std::move`展开为：
+
+```cpp
+typename remove_reference<Foo&>::type&& move(Foo& && t) noexcept
+{
+  return static_cast<typename remove_reference<Foo&>::type&&>(t);
+}
+```
+
+经过remove_reference和引用折叠：
+
+```cpp
+Foo&& move(Foo& t) noexcept
+{
+  return static_cast<Foo&&>(t);
+}
+```
+
+可见：左值经过std::move()变为右值；
+
+**move右值：**
+
+```cpp
+std::move(Foo("xyz"));
+```
+
+根据类型推导规则，`std::move`的类型参数`T`的推导结果是`Foo`，那么`std::move`展开为：
+
+```cpp
+typename remove_reference<Foo>::type&& move(Foo&& t) noexcept
+{
+  return static_cast<typename remove_reference<Foo>::type&&>(t);
+}
+```
+
+经过remove_reference：
+
+```cpp
+Foo&& move(Foo&& t) noexcept
+{
+  return static_cast<Foo&&>(t);
+}
+```
+
+可见：右值经过std::move()还是右值；
+
+## 引用剥除 (4.6)
 
 其实，引用剥除(reference stripping)和引用折叠(reference collapsing)没有一毛钱关系。之所以在这里提它，纯粹是为了消除直观上的混淆。
 

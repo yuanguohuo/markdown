@@ -9,7 +9,7 @@ categories: c++
 
 <!-- more -->
 
-# C++11之前
+# C++11之前 (1)
 
 在C++11之前，左值右值（lvalue和rvalue）的概念已经流淌在C/C++人的血液之中。如何划分左值右值呢？有的书上通过列举的方式，把所有左值右值列出来。但一个更容易的规则：
 * 一个表达式，如果能对它进行&运算(取地址)，则它是左值；
@@ -23,9 +23,9 @@ categories: c++
 
 也就是说，左值右值，既能覆盖所有值，又不存在交集。这样的分类还是比较理想的。但C++11把事情搞的复杂了。
 
-# C++11之后
+# C++11之后 (2)
 
-## 五种类型
+## 五种类型 (2.1)
 
 C++11出现了以下五个名词：
 
@@ -43,7 +43,7 @@ C++11出现了以下五个名词：
 * An rvalue (so called, historically, because rvalues could appear on the right-hand side of an assignment expressions) is an xvalue, a temporary object (12.2) or subobject thereof, or a value that is not associated with an object.
 * A prvalue (“pure” rvalue) is an rvalue that is not an xvalue. [ Example: The result of calling a function whose return type is not a reference is a prvalue. The value of a literal such as 12, 7.3e5, or true is also a prvalue. —end example ]
 
-## 如何区分
+## 如何区分 (2.2)
 
 那如何分清它们呢？其实一个变量只有两个独立的属性：
 
@@ -94,7 +94,7 @@ C++11出现了以下五个名词：
 
 真是够烦的。所幸，这个分类里，lvalue和rvalue和C++11之前还能保持一致，能进行&（取值运算）的是左值，否则为右值。并且，它们全覆盖，且没交集。还有，我们又多了一个理解rvalue的角度：可移动。
 
-## xvalue举例
+## xvalue举例 (2.3)
 
 xvalue可能还是不够清晰，哪些值属于此类呢？
 
@@ -120,7 +120,7 @@ static_cast<Foo&&>(x);
 可见，Case 1和2是等价的，std::move()就是通过static_cast实现的。它们都是把一个左值（有身份）变得可移动，得到一个**有身份且可移动**的值，也就是xvalue。Case 3得到的也是**有身份**（因为它所属对象有身份）**且可移动**（因为它所属对象可移动）的值，也就是xvalue。
 
 
-# 小结
+# 小结 (3)
 
 本文介绍了如何区分C++11引入的五中值的类型。
 
