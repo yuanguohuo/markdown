@@ -1,20 +1,22 @@
 ---
 title: C++11中的完美转发
 date: 2018-05-25 12:04:03
-tags: [完美转发, perfect forwarding, 通用引用, universal reference]
+tags: [完美转发, perfect forwarding, 通用引用, universal reference, emplace, emplace_back]
 categories: c++
 ---
 
-本文介绍完美转发。第1节和第2节，是翻译[这篇文章](http://thbecker.net/articles/rvalue_references/section_07.html)和[这篇文章](http://thbecker.net/articles/rvalue_references/section_08.html)。
+完美转发能够优化函数调用过程中参数传递的效率。本文一部分翻译[这篇文章](http://thbecker.net/articles/rvalue_references/section_07.html)和[这篇文章](http://thbecker.net/articles/rvalue_references/section_08.html)，略加重组并加上个人理解；另一部分介绍了emplace如何实现容器内对象的原地构造。
 
 <!-- more -->
 
 # 问题 (1)
 
-我们想写这样一个工厂模板函数，使用参数`Arg`类型的参数`arg`，构造一个`T`的对象，并返回它的`shared_ptr`。我们的理想是**这层工厂函数就像不存在一样**：
+我们想写这样一个工厂模板函数`factory`，使用参数`Arg`类型的参数`arg`，构造一个`T`的对象，并返回它的`shared_ptr`。我们的理想是**`factory`就像不存在一样**：
 
 * 没有额外的拷贝；就像调用者直接使用`arg`构造`T`的对象一样；
-* 若`arg`是右值，则需要保留其右值的特征(匹配`T`的移动构造函数——若有)；
+* 若`arg`是右值，则需要保留其右值的特征(匹配`T`的移动构造函数————若有)；
+
+这也是*完美*的含义。
 
 ## 尝试1 (1.1)
 
@@ -76,7 +78,7 @@ shared_ptr<T> factory(Arg const & arg)
 回顾一下我们的理想：**这层工厂函数就像不存在一样**：
 
 * 没有额外的拷贝；就像调用者直接使用`arg`构造`T`的对象一样；
-* 若`arg`是右值，则需要保留其右值的特征(匹配`T`的移动构造函数——若有)；
+* 若`arg`是右值，则需要保留其右值的特征(匹配`T`的移动构造函数————若有)；
 
 这要求我们：
 1. 必须按引用传递；且左值和右值必须都能引用；
@@ -227,4 +229,80 @@ X&& forward(X& a) noexcept
 * `std::forward`拿到的是一个左值(所以参数是左值引用)；然后看这个左值是左值引用类型还是右值引用类型，若为前者则返回左值，若为后者则返回右值(所以返回值是通用引用)；
 * `std::move`拿到的可能是左值也可能是右值(所以参数是通用引用)，但一定返回右值(所以返回值是右值引用)；
 
-# (3)
+# emplace (3)
+
+## push_back的右值引用版本 (3.1)
+
+把一个对象加入容器(以`vector`为例)，我们常用`push_back`。在C++11以前，只有这样一个版本：
+
+```cpp
+void push_back (const value_type& val);
+```
+
+从C++11开始，有了右值引用，又增加了一个版本：
+
+```cpp
+void push_back (value_type&& val);
+```
+
+代码：
+
+```cpp
+std::vecotr<Foo> v;
+v.push_back(Foo("123"));
+```
+
+* C++11之前，需要一次完整拷贝：把`push_back`的参数拷贝到`vector`内部。注意，临时对象`Foo("123")`到`push_back`的参数`val`是引用传递的(`const value_type&`可以引用右值)，不需拷贝。
+* C++11开始，需要一次移动拷贝：把`push_back`的参数移动拷贝到`vector`内部。
+
+看来问题有了改善，因为移动构拷贝比完整拷贝代价要小。但，`emplace`效果更好。
+
+
+## 原地构造 (3.2)
+
+从功能上看，`emplace`和我们前文`factory`工厂函数十分相似：给它参数，它给你构造对象，利用完美转发，中间不增加额外的参数的拷贝，就像你直接构造对象一样。但更重要的一点是，**它在容器内部原地构造**。总结来说：
+
+1. 利用完美转发，没有任何参数的拷贝；
+2. 在容器内部原地构造，也不会有对象的拷贝；
+
+以`std::vector`的`emplace_back`为例，它的声明如下：
+
+```cpp
+template< class... Args >
+void emplace_back(Args&&... args);
+```
+
+和前文`factory`不同的是，`emplace_back`的参数个数是变化的，不过没关系，把它理解成*N*个通用引用就行了。例如：
+
+```cpp
+class Bar
+{
+  public:
+    Bar(X&& x, Y&& y);
+};
+
+vector<Bar> v;
+v.emplace_back(X(),Y());
+```
+
+这段代码只有3个构造：`X()`，`Y()`和`Bar(X&&, Y&&)`。临时对象`X()`和`Y()`被完美转发到`Bar`的构造函数，而`Bar`的构造函数在`vector`内原地构造。
+
+问：emplace_back的*N*个参数是什么？
+
+答：是`vector::value_type`的构造函数的参数列表，在上例中，就是`Bar::Bar()`的参数。注意，你不要去调`vector::value_type`的构造函数，而只需要传入参数列表即可，`emplace_back`会帮我们调用。见下文emplace的错误用法。
+
+## emplace的错误用法 (3.3)
+
+如前所述，我们应该把`vector::value_type`的构造函数的参数列表传给`emplace_back`，让它帮我们调用`vector::value_type`的构造函数。一个常见的错误是，传入一个`vector::value_type`类的对象。更糟糕的是，你若这么干了，并不会引起编译错误。因为，你传入`vector::value_type`类的对象，`emplace_back`就拿着这个对象去调用构造函数————当然，是拷贝构造函数。你看，这就引入了一次额外的拷贝，没有达到原地构造的效果。例如：
+
+```cpp
+vector<Bar> v;
+v.emplace_back(Bar(X(),Y()));
+```
+
+这段代码中，除了原有的3个构造(`X()`，`Y()`和`Bar(X&&, Y&&)`)，还多了一个拷贝：`Bar(Bar&&)`。当然，我们传入`emplace_back`的是`vector::value_type`(本例中是Bar)的临时对象(右值)，多出的这个拷贝是移动拷贝构造。若传入的是Bar类型的左值，多出拷贝将是完整拷贝。
+
+
+# 小结 (4)
+
+完美转发一方面通过通用引用接收参数，另一方面使用`std::forward`转发给后续函数，并保留左值/右值特征，就像没有本层传递一样。利用完美转发，emplace可以实现容器内对象的原地构造。
