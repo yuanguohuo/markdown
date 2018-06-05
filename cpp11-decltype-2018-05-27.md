@@ -5,7 +5,7 @@ tags: [decltype]
 categories: c++
 ---
 
-本文前两节翻译自[这篇文章](http://thbecker.net/articles/auto_and_decltype/section_06.html)和[这篇文章](http://thbecker.net/articles/auto_and_decltype/section_07.html)。
+本文翻译自[这个系列文章](http://thbecker.net/articles/auto_and_decltype/section_05.html)，略加重组。主要是总结decltype的推导规则和使用场景。
 
 <!-- more -->
 
@@ -85,7 +85,6 @@ typedef decltype((cx)) cx_with_parens_type;  //cx_with_parens_type是"const int&
 typedef decltype(cx) cx_type;                //cx_type是"const int"
 auto b_p = (cx);                             //b_p的类型是"int"
 auto b = cx;                                 //b的类型是"int"
-
 
 typedef decltype((crx)) crx_with_parens_type; //crx_with_parens_type是"const int&"；crx类型为"const int&"，是lvalue(故再添一个"&"，然后引用折叠)
 typedef decltype(crx) crx_type;               //crx_type是"const int&"
@@ -175,7 +174,7 @@ auto fpmin(T x, S y) -> typename std::remove_reference<decltype(x < y ? x : y)>:
 }
 ```
 
-# decltype的性质 (2)
+# 注意事项 (2)
 
 ## 类型推导的时候不求值 (2.1)
 
@@ -187,6 +186,36 @@ assert(vect.empty());
 typedef decltype(vect[0]) integer; //vect是空的，vect[0]超界，但没问题；
 ```
 
+## decltype(expr)可以出现在类名出现的地方 (2.2)
+
+当`decltype(expr)`的推导结果是类的值类型的时候(不可以是该类的引用或者指针，但可以是const的)，它可以出现在类名出现的地方，例如：
+
+```cpp
+template<typename R>
+class SomeFunctor
+{
+public:
+  typedef R result_type;
+
+  result_type operator()()
+  {
+    return R();
+  }
+};
+
+const SomeFunctor<int> func;   //有没有const都行
+
+class DerivedFunctor1 : public decltype(func)  //decltype(expr)做基类
+{
+};
+typedef decltype(func)::result_type integer;   //访问decltype(expr)的内嵌类型
+
+auto foo = [](){return 42;};  //lambda函数是一个functor
+
+class DerivedFunctor2 : public decltype(func)  //decltype(expr)做基类
+{
+};
+```
 
 # 使用场景 (3)
 
@@ -252,4 +281,22 @@ auto foo(T lhs, S rhs) -> decltype(lhs * rhs)
 
 ## Alternate type deduction on declaration in C++14 (3.3)
 
-## Type deduction for lambda arguments in C++14 (3.4)
+C++14新加了`decltype(auto)`语法。它允许auto声明使用decltype的规则。怎么理解这句呢？
+
+```cpp
+int& foo();
+decltype(auto) i = foo(); //i的类型是"int&"
+```
+
+不太理解，暂时也没找到详细的解释。把它想象成`auto i = foo()`，但auto类型推导的过程中，按`decltype(foo())`的规则来进行，对吗？
+
+假如把`decltype(auto)`换成`auto`，那么`i`的类型将会是"int"(因为引用剥除的缘故)。
+
+```cpp
+int& foo();
+auto i = f(); //i的类型是"int"
+```
+
+# 小结 (4)
+
+本文总结了decltype的推导规则和使用场景。
