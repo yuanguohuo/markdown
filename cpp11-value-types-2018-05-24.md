@@ -87,41 +87,53 @@ C++11出现了以下五个名词：
 * 有身份可以移动：xvalue，见下文；
 * 没有身份可以移动：prvalue，例如字面量，临时对象；
 
-然后，有衍生出来两种：
+基于这3种基础类型，又衍生出来两种：
 
  - 1+2 = glvalue 
  - 2+3 = rvalue
 
 真是够烦的。所幸，这个分类里，lvalue和rvalue和C++11之前还能保持一致，能进行&（取值运算）的是左值，否则为右值。并且，它们全覆盖，且没交集。还有，我们又多了一个理解rvalue的角度：可移动。
 
-## xvalue举例 (2.3)
+总结一下(非常重要)：
 
-xvalue可能还是不够清晰，哪些值属于此类呢？
+* **C++11之前的lvalue = C++11之后的lvalue；**
+* **C++11之前的rvalue = C++11之后的prvalue；**
+* **C++11之前没有xvalue；**
 
- - Case1: 对右值引用函数（返回值是右值引用的函数）的调用.
+那么哪些是xvalue呢？
 
+## 列举xvalue (2.3)
+
+* Case1: 对右值引用函数的调用
 ```cpp
 std::move(x);
-func(); //func()是一个返回右值引用的函数；
+func(); //func的声明：Foo&& func();
 ```
 
- - Case2: 把一个左值强制转换为右值引用.
-
+* Case2: 把一个左值强制转换为右值引用.
 ```cpp
 static_cast<Foo&&>(x);
 ```
 
- - Case3: xvalue的成员.
-
+* Case3: xvalue的成员
 ```
-(static_cast<Foo&&>(x)).m_data;
+std::move(x).m_data;
+func().m_data;  //func的声明：Foo&& func();
+static_cast<Foo&&>(x).m_data;
 ```
 
-可见，Case 1和2是等价的，std::move()就是通过static_cast实现的。它们都是把一个左值（有身份）变得可移动，得到一个**有身份且可移动**的值，也就是xvalue。Case 3得到的也是**有身份**（因为它所属对象有身份）**且可移动**（因为它所属对象可移动）的值，也就是xvalue。
+可见，Case1和Case2是等价的，std::move()就是通过static_cast实现的。它们都是把一个左值(有身份)变得可移动，得到一个**有身份且可移动**的值。Case3得到的也是**有身份**(因为它所属对象有身份)**且可移动**(因为它所属对象可移动)的值。**有身份且可移动的值**就是xvalue。
 
+记住，只有这些是xvalue；C++11之前，右值引用都不存在，更别提xvalue了；
+
+另外，再重复一遍，下例中`std::move(x)`是xvalue，但`f`是**右值引用类型的左值**，不是右值，更不是xvalue————它们的区别是，前者没有名字，后者有名字。详见[C++11中的右值引用](http://www.yuanguohuo.com/2018/05/25/cpp11-rvalue-ref/)。
+
+```cpp
+Foo&& f = std::move(x);
+```
 
 # 小结 (3)
 
-本文介绍了如何区分C++11引入的五中值的类型。
+本文介绍了如何区分C++11引入的五中值的类型。并且列举了xvalue。
 
 参考：https://stackoverflow.com/questions/3601602/what-are-rvalues-lvalues-xvalues-glvalues-and-prvalues
