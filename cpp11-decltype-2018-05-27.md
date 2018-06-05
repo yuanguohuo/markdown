@@ -250,4 +250,6 @@ auto foo(T lhs, S rhs) -> decltype(lhs * rhs)
 1. 在这种语法中，类型推导完全按照decltype的规则进行(见第1节)，和auto的推导规则无关；
 2. 和[C++11中的auto关键字](http://www.yuanguohuo.com/2018/05/25/cpp11-auto/)中提到的"Function return type deduction"进行区别：函数声明中，一个有`->decltype(...)`，一个没有；
 
-## Alternate type deduction on declaration (3.3)
+## Alternate type deduction on declaration in C++14 (3.3)
+
+## Type deduction for lambda arguments in C++14 (3.4)
