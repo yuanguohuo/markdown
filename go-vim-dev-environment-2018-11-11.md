@@ -392,7 +392,7 @@ YouCompleteMe unavailable: requires Vim compiled with Python (2.7.1+ or 3.4+) su
 
 ## 安装YouCompleteMe (6.1)
 
-和安装vim-go插件一样，先在~/.vimrc中的Vundle配置里加入：`Plugin 'Valloric/YouCompleteMe'`，然后执行：`vim +PluginInstall`。这就把YouCompleteMe安装到~/.vim/bundle里了。但是，和vim-go不同的是，YouCompleteMe还需要进一步的安装。在 ~/.vim/bundle/YouCompleteMe/有一个install.py脚本，我们需要运行这个脚本来完成安装。为支持不同的语言，可以给这个脚本提供不同的选项，例如：`--go-completer`，`--java-completer`，`--clang-completer`等。这里我使用`--all`选项，支持所有常见语言。这样依赖也是最多的。下面先安装依赖，然后安装。
+和安装vim-go插件一样，先在~/.vimrc中的Vundle配置里加入：`Plugin 'Valloric/YouCompleteMe'`，然后执行：`vim +PluginInstall`。这就把YouCompleteMe安装到~/.vim/bundle里了。但是，和vim-go不同的是，YouCompleteMe还需要进一步的安装。在 ~/.vim/bundle/YouCompleteMe/有一个install.py脚本，我们需要运行这个脚本来完成安装。为支持不同的语言，可以给这个脚本提供不同的选项，例如：`--go-completer`，`--java-completer`，`--clang-completer`等。这里我使用`--all`选项，支持所有常见语言。这样依赖也是最多的。下面先安装依赖，然后运行脚本。
 
 ```
 # yum install -y cmake
