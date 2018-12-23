@@ -32,8 +32,8 @@ LRUHandle结构是对cache元素的封装，即cache中存的是LRUHandle的实�
 
 ## LRU列表与LRUHandle的状态 (3.2)
 
-LRUCacheShard本质是一个LRUHandleTable的实例加上一个LRU列表。常见的LRU cache的实现方式是一个hash，然后用一个LRU列表把hash中的所有元素串联起来。一个元素被访问就被移动到LRU列表的头部，淘汰时从尾部移除。然而，这里的实现方式却不同：
-- LRU列表并不串联所有的元素(指LRUHandle的实例)，而只串联**可以被淘汰**的元素；
+LRUCacheShard本质是一个LRUHandleTable的实例加上一个LRU列表。常见的LRU cache的实现方式是一个hash，然后用一个LRU列表把hash中的所有元素串联起来。一个元素被访问就被移动到LRU列表的头部，淘汰时从尾部移除。然而，这里的实现方式稍有不同：
+- LRU列表并不串联所有的元素(一个元素就是一个LRUHandle的实例)，而只串联**可以被淘汰**的元素；
 - 什么是**可以被淘汰**的元素呢？答案是满足这两个条件的元素：1.被cache引用(在cache里，即LRUHandle的InCache()==true); 2.只被cache引用(即LRUHandle的refs==1)。所以，如果一个元素的refs为1，但这个引用不是由cache持有，它就不在LRU列表里(元素都不在cache里，谈何淘汰呢)；或者，被cache引用，同时也被外部使用者引用(refs>1)，它也不在LRU列表里(虽然元素在cache里，但还正被使用着，不能淘汰)。总之，LRU用来记录cache中的可以被淘汰的元素，当cache的大小超过设定值时，就从LRU中找元素进行淘汰。
 
 基于上面的描述，可以发现一个元素(LRUHandle实例)可能处于以下3种状态之一：
