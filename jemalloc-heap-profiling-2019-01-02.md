@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 
 ## 程序退出时的泄漏 (2.1)
  
-````
+```
 # MALLOC_CONF=prof_leak:true,lg_prof_sample:0,prof_final:true LD_PRELOAD=/usr/local/jemalloc-5.1.0/lib/libjemalloc.so.2  ./a.out
 <jemalloc>: Leak approximation summary: ~6926352 bytes, ~120 objects, >= 2 contexts
 <jemalloc>: Run jeprof on "jeprof.34447.0.f.heap" for leak detail
