@@ -5,7 +5,7 @@ tags: [jemalloc,heap,profiling,memory leak]
 categories: jemalloc
 ---
 
-使用jemalloc时，可以通过profiling机制来发现并定位内存泄漏(memory leak)。[原文](https://github.com/jemalloc/jemalloc/wiki/Use-Case%3A-Heap-Profiling)。
+使用jemalloc时，可以通过profiling机制来发现并定位内存泄漏(memory leak)。本文翻译自[原文](https://github.com/jemalloc/jemalloc/wiki/Use-Case%3A-Heap-Profiling)并增加了一些例子。
 
 <!-- more -->
 
