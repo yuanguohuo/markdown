@@ -344,10 +344,26 @@ Plugin 'fatih/vim-go'
 vim +PluginInstall
 ```
 
-* 在$GOPATH/bin下安装二进制工具，并在$GOPATH/src/golang.org和$GOPATH/src/github.com下安装它们的源代码。这一步比较慢。
+* 在$GOPATH/bin下安装二进制工具，并在$GOPATH/src/golang.org和$GOPATH/src/github.com下安装它们的源代码。
 ```
 vim +GoInstallBinaries
 ```
+这一步比较慢，并且若没有科学上网，golang.org/x/下的东西都会失败。可以手动安装它们：
+
+```
+mkdir -p $GOPATH/src/golang.org/x/  
+cd $GOPATH/src/golang.org/x/  
+git clone https://github.com/golang/tools.git   
+git clone  https://github.com/golang/net.git
+git clone  https://github.com/golang/text.git  
+git clone  https://github.com/golang/crypto.git  
+git clone  https://github.com/golang/sys.git
+git clone  https://github.com/golang/sync.git
+go install ./...
+```
+
+然后再通过`vim +GoInstallBinaries`安装其他工具。
+
 
 ## 配置vim-go (5.2)
 
