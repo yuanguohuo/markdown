@@ -359,6 +359,7 @@ git clone  https://github.com/golang/text.git
 git clone  https://github.com/golang/crypto.git  
 git clone  https://github.com/golang/sys.git
 git clone  https://github.com/golang/sync.git
+git clone  https://github.com/golang/lint.git
 go install ./...
 ```
 
