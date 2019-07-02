@@ -37,17 +37,7 @@ netlink netfilter包含3个组件：
 * libnetfilter_conntrack：与nfnetlink_conntrack对应；
 * libnfnetlink：与内核模块nfnetlink对应，提供一些底层的处理函数，是上面3个库的基础。
 
-用一张图表示它们之间的关系：
-
-                     +-------------------------------+
-                     |                               |
-                     |                               |
-                     |          图                   |
-                     |                               |
-                     |                               |
-                     |                               |
-                     |                               |
-                     +-------------------------------+
+用一张图表示它们之间的关系：![模块关系图](relationship.jpg)
 
 # netfilter queue (2)
 

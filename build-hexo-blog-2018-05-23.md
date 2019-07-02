@@ -106,7 +106,7 @@ highlight_theme: night eighties
 ```
 hexo new {title}
 ```
-创建一篇新博客的时候，hexo会为我们生成一个{title}.md文件。为了日后方便看博客的创建时间，我们希望.md文件名中带上当前日期。为此，修改_config.yml:
+创建一篇新博客的时候，hexo会为我们生成一个{title}.md文件。为了日后方便看博客的创建时间，我们希望.md文件名中带上当前日期。为此，修改\_config.yml:
 ```shell
 $ vim _config.yml
 new_post_name: :title-:year-:month-:day.md # File name of new posts
@@ -400,15 +400,43 @@ $ hexo deploy
 
 现在，博客就生成了：http://{your-name}.github.io/
 
-# 创建markdown repository (10)
+
+# 引用图片资源 (10)
+
+- **当设置post_asset_folder参数为true**
+
+```shell
+$ vim _config.yml
+post_asset_folder:true
+```
+
+当设置post_asset_folder参数为true后，在建立文件时，hexo会自动建立一个与文章同名的文件夹，用于存放与该文章相关的所有资源。
+
+- **安装hexo-asset-image**
+
+在hexo根目录下执行：
+```shell
+$ npm install https://github.com/CodeFalling/hexo-asset-image --save  
+```
+
+- **生成资源文件夹**
+
+以后再运行hexo n foo来生成博文时，在source/\_posts文件夹下，除了自动生成foo.md文件外，还自动生成一个同名的文件夹，用于存放与本篇博文相关的资源。原有博客需要插入图片的，可以手动mkdir。
+
+- **引用资源**
+
+把图片image.jpg放入资源文件夹foo，然后在博文中通过`![标题](foo/image.jpg)`来引用图片。
+
+# 创建markdown repository (11)
+
 到此为止，博客就搭建起来了。以后写博客，就是创建.md文件。为了保存曾经的博客(.md文件)，我另外创建一个github repository。通过这个repository，在公司和家里的不同电脑上，都可以写博客了。最后，在配置了hexo的电脑上发布。
 
+# 常见错误 (12)
 
-# 常见错误 (11)
 博文.md文件中除了开头部分，若包含"---"，则很容易出一些奇怪的YAMLException，并且报错的位置可能相去甚远，很难定位。例如：
 * YAMLException: end of the stream or a document separator is expected at line x, column y
 * YAMLException: unidentified alias at line x, column y
 * YAMLException: name of an alias node must contain at least one character at line x, column y
 
-# 小结 (12)
+# 小结 (13)
 之前使用CSDN，页面不够漂亮，也不能做一些个性化的设置，所以计划搭一个自己的博客，今天终于得以实现。第一次搭建博客，并且对前端网站不熟悉，踩了不少坑，所以本文记下这个过程，作为开篇。
