@@ -421,11 +421,11 @@ $ npm install https://github.com/CodeFalling/hexo-asset-image --save
 
 - **生成资源文件夹**
 
-以后再运行hexo n foo来生成博文时，在source/\_posts文件夹下，除了自动生成foo.md文件外，还自动生成一个同名的文件夹，用于存放与本篇博文相关的资源。原有博客需要插入图片的，可以手动mkdir。
+以后再运行hexo n foo来生成博文时，在source/\_posts文件夹下，除了自动生成foo-{year}-{month}-{day}.md文件外，还自动生成一个同名的文件夹foo-{year}-{month}-{day}，用于存放与本篇博文相关的资源。原有博客需要插入图片的，可以手动mkdir。
 
 - **引用资源**
 
-把图片image.jpg放入资源文件夹foo，然后在博文中通过`![标题](foo/image.jpg)`来引用图片。
+把图片image.jpg放入资源文件夹foo，然后在博文中通过`![标题](foo/image.jpg)`来引用图片。生成的html(`public/{year}/{month}/{day}/foo/index.html`)中，对图片的引用是这样的：`<img src="/{year}/{month}/{day}/foo/image.jpg" alt="标题"></p>`
 
 # 创建markdown repository (11)
 
