@@ -11,37 +11,44 @@ categories: linux
 
 # netlink与netfilter (1)
 
-linux的netlink用于在内核态进程和用户态进程之间的通信。它包含两个方面：1.用户态进程的接口：基于socket的，类似于unix domain的接口；2.内核模块的接口：内部kernel API。它们就像一根管子的两端，内核程序员基于后者开发内核模块，用户态程序员基于前者开发用户态程序。本文不涉及后者。对于前者，/usr/include/linux/netlink.h中定义了一种地址类型(sockaddr_nl，类比sockaddr_un，sockaddr_in或者sockaddr_in6)，这种地址类型和domain AF_NETLINK(类比AF_UNIX，AF_INET或AF_INET6)配合，提供基于socket的接口供用户态进程使用。AF_NETLINK里支持很多种协议：NETLINK_ROUTE， NETLINK_USERSOCK，NETLINK_NETFILTER……协议用于选择与之通信的内核模块或者netlink族。
+linux的netlink用于在内核和用户态进程之间的通信。它包含两个方面：1.用户态进程的接口：基于socket的，类似于unix domain的接口；2.内核模块的接口：内部kernel API。它们就像一根管子的两端，内核程序员基于后者开发内核模块，用户态程序员基于前者开发用户态程序。本文不涉及后者。对于前者，/usr/include/linux/netlink.h中定义了一种地址类型(sockaddr_nl，类比sockaddr_un，sockaddr_in或者sockaddr_in6)，这种地址类型和domain AF_NETLINK(类比AF_UNIX，AF_INET或AF_INET6)配合，提供基于socket的接口供用户态进程使用。AF_NETLINK里支持很多种协议：NETLINK_ROUTE， NETLINK_USERSOCK，NETLINK_NETFILTER……协议用于选择与之通信的内核模块或者netlink族。本文只关注NETLINK_NETFILTER协议。
 
-netlink netfilter包含3个组件：
+NETLINK_NETFILTER协议对应的是netfilter，netfilter包含3个功能：
 
 * netfilter log
 * netfilter queue
 * netfilter conntrack。
 
-内核里有4个netfilter模块：
+这3个功能都包含**内核模块**和**用户态库**两部分。
+
+**内核模块:**
 
 * nfnetlink_log
 * nfnetlink_queue 
 * nfnetlink_conntrack
 * nfnetlink
 
-前3个对应netfilter的3个组件。最后一个是nfnetlink，它是一个基于netlink的传输层，为上面的3个模块提供一个统一的kernel/userspace接口。
+前3个模块对应netfilter的3个功能。最后一个是nfnetlink，它是一个基于netlink的传输层(内核态)，为前3个模块提供一个统一的kernel/userspace接口。
 
-总之，netlink是一个内核态进程和用户态进程的通信接口；而netfilter是基于netlink的内核模块族，包含3个组件：nfnetlink_log,nfnetlink_queue,nfnetlink_conntrack。与它们对应的协议就是NETLINK_NETFILTER。
-
-说完内核态的模块，下面说说用户态的库。用户态的库和内核态模块是对应的：
+**用户态库:**
 
 * libnetfilter_log：与nfnetlink_log对应；
 * libnetfilter_queue：与nfnetlink_queue对应；
 * libnetfilter_conntrack：与nfnetlink_conntrack对应；
 * libnfnetlink：与内核模块nfnetlink对应，提供一些底层的处理函数，是上面3个库的基础。
 
+前3个库对应netfilter的3个功能。最后一个是libnfnetlink，它是一个基于netlink的传输层(用户态)，为前3个模块提供一个统一的kernel/userspace接口。
+
+总之:
+- netlink是一个内核和用户态进程的通信机制(一种socket)，支持多种协议；
+- 其中一种协议是NETLINK_NETFILTER，与之对应的是netfilter；
+- netfilter包含3个功能，每个功能都包含内核模块和用户态库两部分；
+
 用一张图表示它们之间的关系：![模块关系图](relationship.jpg)
 
 # netfilter queue (2)
 
-从第1节可以看出，netfilter queue涉及到以下内核模块和用户态库：
+netfilter queue是netfilter的3个功能之一，它涉及到以下内核模块和用户态库：
 
 * nfnetlink_queue：内核模块，linux 2.6版本引入的，用于代替ip_queue。ip_queue用于将数据包从内核空间传递到用户空间，缺点是只能有一个应用程序接收内核数据。nfnetlink_queue兼容ip_queue(从linux 3.5开始就被移除了)，但支持多个应用程序(最大65535)。需要注意的是，从内核到用户空间的通道还是只有一个，这里说的65536个子队列的实现就象802.1Q实现VLAN一样是在数据包中设置ID号来区分的，不同ID的包都通过相同的接口传输，只是在两端根据ID号进行了分类处理。
 * nfnetlink：内核模块，其地位和作用见1节。
@@ -49,6 +56,8 @@ netlink netfilter包含3个组件：
 * libnetfilter_queue：用户态库，它是本文的主题，见下文。
 
 # libnetfilter_queue的依赖 (3)
+
+简单的讲，netfilter queue涉及到的内核模块和用户态库有4个，libnetfilter_queue依赖于其他3个。
 
 ## nfnetlink_queue (3.1)
 
@@ -69,7 +78,7 @@ netlink netfilter包含3个组件：
 
 一个用户态库，面向netlink开发者。因为在netlink开发中，有很多重复性的通用的工作，例如解析，验证，构造netlink头和TLV等等，很容易出错。这个库提供了这些封装，避免每个项目重复造轮子。所以，虽然libnfnetlink和libmnl都是基于netlink socket接口的库，但容易看出它们的不同点在于，libmnl提供netlink开发所需的基本封装，不针对哪一个内核模块和协议，而libnfnetlink针对netfilter和NETLINK_NETFILTER协议。
 
-libnetfilter_queue有两套接口，新的接口基于libmnl。
+libnetfilter_queue有两套接口，新的基于libmnl，而旧的基于libnfnetlink；
 
 # 安装libnetfilter_queue(3)
 
