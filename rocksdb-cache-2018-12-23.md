@@ -14,7 +14,7 @@ categories: rocksdb
 LRUHandle结构是对cache元素的封装，即cache中存的是LRUHandle的实例。它实现了一个key-value对。它的字段的含义显而易见，这里只说明以下几点：
 
 * 它没有使用模板，value通过void指针(`void*`)来表示；
-* key是一个char数组(`char key_data[]`)，但结构体中只存储第一个char，后续部分紧跟着结构体。所以，一方面需要一个成员表示key的长度(`size_t key_length`)，另一方面要求`char key_data`是结构体的最后一个成员；
+* key是一个char数组(`char key_data[]`)，但结构体中只存储第一个char，后续部分紧跟着结构体。所以，一方面需要一个成员表示key的长度(`size_t key_length`)，另一方面要求`char key_data`是结构体的最后一个数据成员；
 * Free()是实例的destructor，但它不是通过`delete this`来实现(调用析构函数`~LRUHandle`)，而是调用使用者提供的`deleter`来销毁`value`，并通过`delete[] reinterpret_cast<char*>(this)`来销毁实例本身。这是因为：1.本类并不知道如何销毁`value`(因为它是void指针)，需要使用者提供`deleter`; 2.实例本身是通过`reinterpret_cast<LRUHandle*>(new char[...])`分配的(见`LRUCacheShard::Insert`)，需要对应的`delete[] char*`来销毁。注意：`delete[] reinterpret_cast<char*>(this)`不调用this的析构函数。
 
 
@@ -32,8 +32,8 @@ LRUHandle结构是对cache元素的封装，即cache中存的是LRUHandle的实�
 
 ## LRU列表与LRUHandle的状态 (3.2)
 
-LRUCacheShard本质是一个LRUHandleTable的实例加上一个LRU列表。常见的LRU cache的实现方式是一个hash，然后用一个LRU列表把hash中的所有元素串联起来。一个元素被访问就被移动到LRU列表的头部，淘汰时从尾部移除。然而，这里的实现方式稍有不同：
-- LRU列表并不串联所有的元素(一个元素就是一个LRUHandle的实例)，而只串联**可以被淘汰**的元素；
+LRUCacheShard本质是一个LRUHandleTable的实例加上一个LRU列表。常见的LRU cache的实现方式是一个hash，然后用一个LRU列表把hash中的所有元素串联起来。一个元素被访问就被移动到LRU列表的头部(这样热的元素在头部，冷的元素在尾部)，淘汰时从尾部移除。然而，这里的实现方式稍有不同：
+- LRU列表`lru_`并不串联所有的元素(一个元素就是一个LRUHandle的实例)，而只串联**可以被淘汰**的元素；
 - 什么是**可以被淘汰**的元素呢？答案是满足这两个条件的元素：1.被cache引用(在cache里，即LRUHandle的InCache()==true); 2.只被cache引用(即LRUHandle的refs==1)。所以，如果一个元素的refs为1，但这个引用不是由cache持有，它就不在LRU列表里(元素都不在cache里，谈何淘汰呢)；或者，被cache引用，同时也被外部使用者引用(refs>1)，它也不在LRU列表里(虽然元素在cache里，但还正被使用着，不能淘汰)。总之，LRU用来记录cache中的可以被淘汰的元素，当cache的大小超过设定值时，就从LRU中找元素进行淘汰。
 
 基于上面的描述，可以发现一个元素(LRUHandle实例)可能处于以下3种状态之一：
@@ -42,7 +42,7 @@ LRUCacheShard本质是一个LRUHandleTable的实例加上一个LRU列表。常�
 * 状态C: 只被外部使用者引用(InCache()==false)；
 
 可见：只有处于状态B的元素才在LRU列表里。我们看一个典型的元素的生命周期：
-- 被user-a创建并返回引用：这时元素有两个引用(refs==2)，一个由cache持有，另一个由user-a持有。元素在cache中但不在LRU列表里；
+- user-a调用`LRUCacheShard::Insert`创建元素并返回引用：这时元素有两个引用(refs==2)，一个由cache持有，另一个由user-a持有。元素在cache中但不在LRU列表里；
 - user-b调用`LRUCacheShard::Lookup`得到这个元素，refs==3；元素在cache中但不在LRU列表里；
 - user-a调用`LRUCacheShard::Release`释放这个元素，refs==2；元素在cache中但不在LRU列表里；
 - user-b调用`LRUCacheShard::Release`释放这个元素，refs==1；这时把元素插入LRU列表，表示在必要时可以淘汰它；
