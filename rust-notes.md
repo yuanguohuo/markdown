@@ -17,9 +17,10 @@ Vector的数据一定在heap上。可以使用以下3中方式创建vector:
 - `Vec::new()`: 创建一个空的vector；
 - `Vec::with_capacity(cap)`: 创建一个空的vector，但有cap个空间；
 - `vec![2, 3]`: 等价于`Vec::with_capacity()`并`push`元素2和3；
+
 Vector变量是一个三元组: (pointer, capacity, length)，和golang的slice有点像。从功能上类似于C/C++的动态数组`T *a = new T[length];`
 
-注意：一些有用的方法(迭代元素，搜索，排序等)不是array和vector的方法，而是slice reference。rust能够把array和vector隐士的转换为slice reference，所以，我们可以直接对array和vector调用这些方法。
+注意：一些有用的方法(迭代元素，搜索，排序等)不是array和vector的，而是slice reference的。rust能够把array和vector隐士的转换为slice reference，所以，我们可以直接对array和vector调用这些方法。
 ```
 let mut chaos = [3, 5, 4, 1, 2];
 chaos.sort();
@@ -88,3 +89,71 @@ String可以理解为Vec<u8>，唯一要求是u8序列必须可以解析为UTF-8
 |range syntax v[start..stop]          |Yes, returns &[u8]      |Yes, returns &str       |
 |automatic conversion                 |&Vec<u8> to &[u8]       |&String to &str         |
 |inherits methods                     |from &[u8]              |from &str               |
+
+# Ownership, move and lifetime (4)
+
+对于变量的生命周期，目前主流语言在a.由程序员控制和b.自动gc中二选其一。前者如C/C++，或者如Java和Go。前者容易出bug：dangling pointer, double free等；后者程序员失去了对变量生命周期的控制，有的时候很难搞清楚该释放的内存为什么没有释放。释放时机不可依赖，释放造成stw等问题也比较棘手(还有，内存以外的其他资源，例如网络连接和文件句柄的生命周期，还是需要程序员控制。理论上讲，内存和网络连接及文件句柄都是资源，采取两种方式去管理似乎也不够优雅)。总之，这两种方式都不够理想，理想的是：程序员能够控制变量的生命周期并且语言应该是安全的(没有dangling pointer, double free等问题)。这就是rust的努力方向。
+
+## Ownership (4.1)
+
+- 每一个值有唯一一个owner，但一个值可以own其他它个值。当owner生命周期结束，它own的所有值的生命周期都结束；
+- 值之间的owning关系形成一棵树；
+- rust程序中的每个值都属于唯一的某一棵树，树的根是某个变量；
+- 当根变量的生命周期结束，树中所有值的生命周期都结束，被drop掉；
+
+可见ownership的规则相当的严苛，但有3个途径来放松这些规则：move，Rc/Arc以及borrowing reference。
+
+## Move (4.2)
+
+和C++11中的move类似，只不过C++11中只有右值(prvalue和xvalue)才能被move，若左值也可以被move，那么它出现在等号的右边(或作为函数参数，作为函数返回值)一次，就改变了(丢失了资源)，很不符合常理：要找一个变量可能发生改变的地方，只找它在等号左边的出现就行了，谁会管它在等号右边的出现呢？
+
+然而，rust就是这么干的：不分左值右值，都能被move。变量出现在等号的右边也会发生改变(丢失自己的资源)。好在，rust会在编译时做检查，确保丢失了资源(被move，变成uninitialized状态)的变量不能再被使用。当然，作为函数参数或函数返回值和出现在等号右边是一样的。
+
+好吧，事情也没那么绝对：rust的类型分为Move和Copy两类，上面说的这些都是真对Move类型的。只是rust中绝大多数类型是Move，小部分是Copy。
+- Copy类型：逐位拷贝就足够的，drop时不需要额外操作的(例如unlock，释放堆空间，关闭文件句柄，断开连接等)。例如：整数类型，浮点类型，`char`，`bool`；以及这些类型组成的tuple好固定大小的array。还有，若自定义的struct或enum只包含Copy类型的字段，程序员可以用`#[derive(Copy, Clone)]`把它声明为Copy类型的(注意：默认不是Copy的而是Move的)。
+- Move类型：其他。例如：`String`，`Box<T>`，`File`，`MutexGuard`等。程序员自定义类型默认是Move的，即使它只包含Copy类型的字段。
+本质上讲：在rust中，赋值(以及参数传递和函数返回)，都是按字节拷贝(例如拷贝整数，Vec三元组等)，不同之处在于：对于Copy类型，赋值(以及参数传递和函数返回)之后，源变量还保持为initialized，而对于Move类型源变量变成了uninitialized。
+
+另外，C++中赋值可以被程序员重载，里面可重可轻，重的如深拷贝大块内存甚至分配别的资源，轻的如move，这使得赋值，参数传递，函数返回等基本操作的代价不可预测。相反，rust中这些基本操作都是内存的按字节拷贝(拷贝的量比较小，例如一个整数，一个Vec三元组等)，代价比较明晰；而重的操作，如Clone，是显性的。
+
+注意：
+
+```
+    let mut str_vec = Vec::new();
+    for i in 101..106 
+    {
+        str_vec.push(i.to_string());
+    }
+
+    //let _third = str_vec[2];     //编译不通过
+    
+    let mut i_vec = Vec::new();
+    for i in 1..16
+    {
+        i_vec.push(i)
+    }
+
+    let _forth = i_vec[3];         //OK，没问题
+```
+
+对于Move类型，indexed对象不能被move，否则导致Vec内有uninitialized空洞。可以用`pop`, `swap_remove`, `std::mem::replace`等操作。对于Copy类型则没有这个问题。
+
+```
+    let v = vec![
+                    "hello".to_string(),
+                    "rust".to_string(),
+                    "programmers".to_string()
+                ];
+
+    for mut s in v 
+    {
+        s.push('!');
+        println!("{}", s);
+    }
+```
+
+这段代码的特殊之处在于：不是v的元素一个个的被move到s，而是v直接被move到一个隐藏变量中(v变成uninitialized)，然后这个隐藏变量的元素被一个个move到s(s是owner所以能够修改字符串)。在循环的过程中，这个隐藏变量是有空洞的(部分元素被move)，但这个状态是不可见的。
+
+## Rc and Arc (4.3)
+
+## Borrow reference (4.4)
