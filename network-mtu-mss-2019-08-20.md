@@ -1,9 +1,11 @@
 ---
-title: tcpdump的使用 
-date: 2018-09-12 22:50:12
+title: MTU和TCP MSS 
+date: 2019-08-20 21:31:21
 tags: [network,mtu,mss,tso]
 categories: network 
 ---
+
+简单介绍MTU，TCP MSS和TSO。
 
 <!-- more -->
 
