@@ -9,9 +9,7 @@ categories: network
 
 # MTU (1)
 
-## Ethernet MTU (1.1)
-
-MTU(maximum transmission unit)，即最大传输单元，是指一种通信协议的某一层上面所能通过的最大数据包大小（以字节为单位）。一些常见链路层协议MTU的缺省数值如下：
+MTU(maximum transmission unit)，即最大传输单元，是指一种通信协议的某一层上面所能通过的最大数据包大小（以字节为单位）。通常所说的MTU是数据链路层的概念。一些常见链路层协议MTU的缺省数值如下：
 
 - FDDI协议：4352字节
 - 以太网（Ethernet）协议：1500字节
@@ -19,17 +17,11 @@ MTU(maximum transmission unit)，即最大传输单元，是指一种通信协�
 - X.25协议（Dial Up/Modem）：576字节
 - Point-to-Point：4470字节
 
-平时接触的主要是以太网。由于以太网传输电气方面的限制，每个以太网帧最小64字节，最大不能超过1518字节。以太网的frame头是14字节(source MAC addr和destination MAC addr各6字节共12字节，加上2字节的type，共14字节)，frame尾是4字节(CRC)，所以还有剩1518-14-4=1500字节。这就是以太网的MTU。
-
-然而，这个1500字节就是IP报文的最大长度。高层协议可能生成大于1500字节的报文，所以IP层(第三层)会进行分片(fragmentation)。
-
-## IP MTU (1.2)
-
-由于电气方面的限制，Ethernet的MTU是固定的1500。而IP的MTU可以设置，当然设置的范围受到Ethernet MTU的限制，通常设置为900或1500(1500也就是IP MTU可以设置的最大值)。注意一点：这里Ethernet MTU是指Ethernet的payload的最大长度；而IP MTU不是指IP的payload的最大长度，而是指IP报文(包含IP头)的最大长度。
+平时接触的主要是以太网。由于以太网传输电气方面的限制，每个以太网帧最小64字节，最大不能超过1518字节。以太网的frame头是14字节(source MAC addr和destination MAC addr各6字节共12字节，加上2字节的type，共14字节)，frame尾是4字节(CRC)，所以还有剩1518-14-4=1500字节。这就是以太网的MTU，也就是Ethernet的payload(通常是IP报文)的最大长度。高层协议可能生成大于1500字节的报文，所以IP层(第三层)会进行分片(fragmentation)。
 
 # TCP MSS (2)
 
-分片会带来一些开销。所以，有的时候应该避免。所以，TCP在建连的时候会协商一个MSS (maximum segment size)，这个MSS是TCP payload的最大长度。因为IP头是20字节，TCP头也是20字节，所以通过MSS是1500-20-20=1460字节。
+分片会带来一些开销。所以，有的时候应该避免。TCP在建连的时候会协商一个MSS (maximum segment size)，这个MSS是TCP payload的最大长度。因为IP头是20字节，TCP头也是20字节，所以通过MSS是1500-20-20=1460字节。
 
 ![TCP MSS](tcp-mss.png)
 
