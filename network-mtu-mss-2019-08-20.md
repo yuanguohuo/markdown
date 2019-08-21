@@ -1,5 +1,5 @@
 ---
-title: MTU和TCP MSS 
+title: MTU,MSS和TSO
 date: 2019-08-20 21:31:21
 tags: [network,mtu,mss,tso]
 categories: network 
@@ -44,9 +44,13 @@ TCP header的options字段只在SYN=1的时候出现。MSS是其中的一个opti
 
 ![TSO On](tso-on.png)
 
-建连过程中协商的MSS是1460，但是发的包确慢慢增大，最后到5840（大于1460）了。这是为什么呢？这是由TSO (TCP Segmentation Offload)导致的。TSO把分片逻辑下放到(offload)网络接口卡(NIC)，以减少CPU的负载。当然，这需要NIC支持这个功能：把数据分片，然后给每个分片添加上TCP头，IP头以及Ethernet头。为了支持TSO，NIC还需要支持outbound (TX) checksumming 和scatter gather。TSO也叫做Large Segment Offload (LSO)。
+建连过程中协商的MSS是1460，但是发的包却慢慢增大，最后到了5840（大于1460）。这是为什么呢？答案是TSO (TCP Segmentation Offload；也叫做LSO: Large Segment Offload)。TSO是一种利用网卡的少量处理能力，降低CPU发送数据包负载的技术。它把分片逻辑从CPU下放到(offload)网络接口卡(NIC)，以减少CPU的负载。当然，这需要NIC硬件及驱动的支持。
 
-`ethtool -k和ethtool -K`可以用来查看和修改TSO。
+当不支持TSO或TSO被关闭时，TCP层向IP层发送数据会考虑MSS，使得TCP向下发送的数据可以包含在一个IP分组中而不会造成分片。而当网卡支持TSO且TSO被打开，TCP层会逐渐增大MSS（总是整数倍数增加），当TCP层向下发送大块数据时，仅仅计算TCP头，网卡接到到了IP层传下的大数据包后自己重新分成若干个数据包，复制TCP头，添加IP头和链路层的frame头，并且重新计算校验和等相关数据，这样就把一部分CPU相关的处理工作转移到由网卡来处理。
+
+注意MSS在建连的时候是遵从MTU的限制的，但当TSO打开时，MSS会逐渐增大，超出了MTU的限制。当然，IP的payload最大是64KiB，无论MSS增大到多大，TCP报文（包含TCP头的数据）的最大长度也就是64KiB。MSS增长到大于64KiB的时候，已经不再用于限制TCP报文大小了，而可能影响拥塞控制(???)。
+
+为了支持TSO，NIC还需要支持outbound (TX) checksumming 和scatter gather。可以用命令`ethtool -k和ethtool -K`来查看和修改这些配置。
 
 ```
 # ethtool -k eth0
@@ -67,7 +71,6 @@ tcp-segmentation-offload: on
         tx-tcp6-segmentation: on
         tx-tcp-mangleid-segmentation: on
 
-
 # ethtool -K eth0 tx off sg off tso off
 Actual changes:
 tx-checksumming: off
@@ -82,6 +85,6 @@ tcp-segmentation-offload: off
 generic-segmentation-offload: off [requested on]
 ```
 
-再抓包，发现每个TCP payload都是1460了：
+上面关闭了TSO，再抓包，发现每个TCP payload都是1460了：
 
 ![TSO Off](tso-off.png)
