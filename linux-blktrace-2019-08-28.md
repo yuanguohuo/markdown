@@ -29,6 +29,19 @@ blktrace会区分两类请求:
 * 文件系统请求(fs requests)：通常是用户态进程产生的，读写disk的特定位置和特定大小的数据。当然，也有可能由内核产生：flust脏页或sync文件系统的元数据(super block或journal block等)。
 * SCSI命令(pc requests)：blktrace直接把SCSI命令发送到用户态，blkparse可以解析它。
 
+简单情况下，可以**实时解析**：一边导出IO事件，一边解析。
+
+```
+blktrace -d /dev/sda -o - | blkparse -i -
+```
+
+更常见的是**事后解析**：先用blktrace把trace到的IO事件导出来保存在文件中，然后使用`blkparse`进行解析。
+
+```
+blktrace -d /dev/sda
+blkparse -i sda 
+```
+
 # IO流程与event (2)
 
 一个IO可能发起于:
@@ -95,3 +108,4 @@ drv_data: additional driver specific trace
 ```
 
 # 使用blkparse命令分析数据 (4)
+
