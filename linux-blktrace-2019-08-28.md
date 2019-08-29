@@ -70,12 +70,11 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 所以，一个完整的IO流程是：
 
-![IO流程](io-flow-1.jpg)
+<div align=center>![IO流程](io-flow-1.jpg)
 
 其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。所以，最典型的IO流程是：
 
-![简化的IO流程](io-flow-2.jpg)
-
+<div align=center>![简化的IO流程](io-flow-2.jpg)
 
 # 使用blktrace命令导出原始数据 (3)
 
@@ -84,6 +83,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 - `-d`: 指定被trace的device。
 - `-o`: 指定生成文件名`{device}.blktrace.{cpu}`的`{device}`部分。不指定时，默认为形如`sda`,`sdb`的设备名。这个通常用于和blkparse配合使用：1. **实时解析**：blktrace的`-o`选项为`-`，blkparse的`-i`选项也为`-`；2. **事后解析**：blktrace的`-o`选项为`x`，blkparse的`-i`选项也必须为`x`(若blktrace不指定`-o`选项，则使用默认的形如`sda`的设备名，此时blkparse的`-i`选项也必须是形如`sda`的设备名)。另外，可以使用多个`-d`选项来同时trace多个device，在这种情况下，`-o`无法使用（会报错）；然而，通常情况下，我们也不会同时trace多个device。
 - `-a`: mask，也就是让blktrace只trace指定的IO。
+- `-w`: 运行时间，单位是秒。若不指定，一直运行，直到被Ctrl-C停止。
 
 支持的mask有：
 
@@ -102,10 +102,38 @@ notify: trace messages
 drv_data: additional driver specific trace
 ```
 
-例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，并不需要`-d`以外的选项。
+例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，只需`-d`和`-w`选项，例如：
 
 ```
+# blktrace -d /dev/sde -w 60
+
+# ll
 ```
 
 # 使用blkparse命令分析数据 (4)
 
+blktrace导出的信息是二进制的不可读的，需要blkparse来解析。
+
+blkparse的输出包含两个部分：1. IO事件；2. summary
+
+* **IO事件**
+
+<div align=center>![IO事件](blkparse-output-1.png)
+
+* 第1列：`8,0`是设备号，major和minor；
+* 第2列：`3`是cpuid；
+* 第3列：`11`是序列号；
+* 第4列：`0.009507758`是时间偏移；
+* 第5列：`697`是发起IO的进程的PID；
+* 第6列：`C`是Event，见第2节；
+* 第7列：R:Read; W:Write; D:Block; B:Barrier-Operation; N:...
+* 第8列：`223490 + 56`是IO的起始block number和读写的block数；即offset和size；
+* 第9列：`kjournald`是进程名；
+
+其实这是默认输出格式，我们也可以自定义其格式(类似于`date`命令自定义日期时间格式)：`%M`是major设备号；`%m`是minor设备号；`%c`表示cpuid；`%s`表示序列号；`%T`表示时间(秒)；`%t`表示时间(纳秒)；`%P`是进程PID；`%a`是事件；等等，详见`man blkparse`。
+
+* **Summary**
+
+Summary包括CPU和device两个维度:
+
+<div align=center>![summary](blkparse-output-2.png)
