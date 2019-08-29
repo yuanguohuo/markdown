@@ -57,11 +57,11 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 所以，一个完整的IO流程是：
 
-[!IO流程](io-flow-1.jpg)
+![IO流程](io-flow-1.jpg)
 
 其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。所以，最典型的IO流程是：
 
-[!简化的IO流程](io-flow-2.jpg)
+![简化的IO流程](io-flow-2.jpg)
 
 
 # 使用blktrace命令导出原始数据 (3)
@@ -69,7 +69,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 如前所述，运行blktrace可以导出内核组件trace到的IO events，并把信息写到当前目录下。常用的选项有：
 
 - `-d`: 指定被trace的device。
-- `-o`: 指定生成文件名`{device}.blktrace.{cpu}`的`{device}`部分。不指定时，默认为形如`sda`,`sdb`的设备名。这个通常用于和blkparse配合使用：1. 实时trace：blktrace的`-o`选项为`-`，blkparse的`-i`选项也为`-`；2. 事后处理：blktrace的`-o`选项为`x`，blkparse的`-i`选项也必须为`x`(若blktrace不指定`-o`选项，则使用默认的形如`sda`的设备名，此时blkparse的`-i`选项也必须是形如`sda`的设备名)。
+- `-o`: 指定生成文件名`{device}.blktrace.{cpu}`的`{device}`部分。不指定时，默认为形如`sda`,`sdb`的设备名。这个通常用于和blkparse配合使用：1. **实时解析**：blktrace的`-o`选项为`-`，blkparse的`-i`选项也为`-`；2. **事后解析**：blktrace的`-o`选项为`x`，blkparse的`-i`选项也必须为`x`(若blktrace不指定`-o`选项，则使用默认的形如`sda`的设备名，此时blkparse的`-i`选项也必须是形如`sda`的设备名)。另外，可以使用多个`-d`选项来同时trace多个device，在这种情况下，`-o`无法使用（会报错）；然而，通常情况下，我们也不会同时trace多个device。
 - `-a`: mask，也就是让blktrace只trace指定的IO。
 
 支持的mask有：
@@ -89,8 +89,9 @@ notify: trace messages
 drv_data: additional driver specific trace
 ```
 
-例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件。当然，影响性能的时候除外。
+例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，并不需要`-d`以外的选项。
 
-
+```
+```
 
 # 使用blkparse命令分析数据 (4)

@@ -9,17 +9,17 @@ categories: java
 
 <!-- more -->
 
-# Throwable
+# Throwable (1)
 
 ![Throwable](throwable.jpg)
 
-# `Error`和`Exception`
+# Error和Exception (2)
 
 `Error`类主要代表程序运行的环境出错。例如`OutOfMemoryError`表示JVM内存耗尽；`StackOverflowError`表示栈溢出。不能用`try-catch`来处理`Error`(即使能用catch住，也无法recover)。如上图所示，`Error`都是unchecked(见下文)。
 
 与`Error`不同，`Exception`类主要代表程序本身的错误，可以使用`try-catch`处理。`Exceptio`n分为两种：checked和unchecked。
 
-# checked和unchecked
+# checked和unchecked (3)
 
 - checked：编译器在编译阶段会检查这类异常，它强迫程序员要么用`try-catch`处理，要么使用`throws`声明抛出。这也是"checked"这个词的意义。Checked异常一般是可以被recover的。
 
