@@ -32,14 +32,14 @@ blktrace会区分两类请求:
 简单情况下，可以**实时解析**：一边导出IO事件，一边解析。
 
 ```
-blktrace -d /dev/sda -o - | blkparse -i -
+blktrace -d /dev/sde -o - | blkparse -i -
 ```
 
 更常见的是**事后解析**：先用blktrace把trace到的IO事件导出来保存在文件中，然后使用`blkparse`进行解析。
 
 ```
-blktrace -d /dev/sda
-blkparse -i sda 
+blktrace -d /dev/sde
+blkparse -i sde 
 ```
 
 # IO流程与event (2)
@@ -76,7 +76,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 <div align=center>![简化的IO流程](io-flow-2.jpg)
 
-# 使用blktrace命令导出原始数据 (3)
+# 使用blktrace导出原始数据 (3)
 
 如前所述，运行blktrace可以导出内核组件trace到的IO events，并把信息写到当前目录下。常用的选项有：
 
@@ -102,15 +102,33 @@ notify: trace messages
 drv_data: additional driver specific trace
 ```
 
-例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，只需`-d`和`-w`选项，例如：
+例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，只需`-d`和`-w`选项，例如，在一个32核的服务器上trace设备/dev/sde：
 
 ```
 # blktrace -d /dev/sde -w 60
 
-# ll
+# ll -h
+total 3.7M
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.0
+-rw-r--r-- 1 root root  472 Aug 30 11:19 sde.blktrace.1
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.10
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.11
+...
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.19
+-rw-r--r-- 1 root root 620K Aug 30 11:19 sde.blktrace.2
+-rw-r--r-- 1 root root 621K Aug 30 11:19 sde.blktrace.20
+-rw-r--r-- 1 root root  472 Aug 30 11:19 sde.blktrace.21
+...
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.29
+-rw-r--r-- 1 root root  360 Aug 30 11:19 sde.blktrace.3
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.30
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.31
+-rw-r--r-- 1 root root 620K Aug 30 11:19 sde.blktrace.4
+...
+-rw-r--r-- 1 root root    0 Aug 30 11:19 sde.blktrace.9
 ```
 
-# 使用blkparse命令分析数据 (4)
+# 使用blkparse分析数据 (4)
 
 blktrace导出的信息是二进制的不可读的，需要blkparse来解析。
 
@@ -126,14 +144,126 @@ blkparse的输出包含两个部分：1. IO事件；2. summary
 * 第4列：`0.009507758`是时间偏移；
 * 第5列：`697`是发起IO的进程的PID；
 * 第6列：`C`是Event，见第2节；
-* 第7列：R:Read; W:Write; D:Block; B:Barrier-Operation; N:...
-* 第8列：`223490 + 56`是IO的起始block number和读写的block数；即offset和size；
+* 第7列：R:Read; W:Write; D:Block; B:Barrier-Operation; S:Sync; N:Notify(比较新的内核才有，比如linux kernel 3.10)；
+* 第8列：`223490 + 56`是IO的起始sector号和读写的sector数；即offset和size；
 * 第9列：`kjournald`是进程名；
 
-其实这是默认输出格式，我们也可以自定义其格式(类似于`date`命令自定义日期时间格式)：`%M`是major设备号；`%m`是minor设备号；`%c`表示cpuid；`%s`表示序列号；`%T`表示时间(秒)；`%t`表示时间(纳秒)；`%P`是进程PID；`%a`是事件；等等，详见`man blkparse`。
+其实这是默认输出格式，我们也可以通过`-f`选项自定义其格式(类似于`date`命令自定义日期时间格式)：`%M`是major设备号；`%m`是minor设备号；`%c`表示cpuid；`%s`表示序列号；`%T`表示时间(秒)；`%t`表示时间(纳秒)；`%P`是进程PID；`%a`是事件；等等，详见`man blkparse`。
 
 * **Summary**
 
 Summary包括CPU和device两个维度:
 
 <div align=center>![summary](blkparse-output-2.png)
+
+**例1**：把/dev/sde(设备号:8,64)整个盘格式化成ext4，挂载到/mnt并使用fio写/mnt/fio-test-file (rw=randwrite ioengine=psync bs=4k fsync=1)，同时trace /dev/sde
+
+```
+# blktrace -d /dev/sde -w 60
+
+# blkparse -i sde
+
+......
+
+  8,64  11     2944    33.779658276 90790  Q   W 7614344 + 24 [fio]
+  8,64  11     2945    33.779659493 90790  G   W 7614344 + 24 [fio]
+  8,64  11     2946    33.779660124 90790  P   N [fio]
+  8,64  11     2947    33.779661287 90790  I   W 7614344 + 24 [fio]
+  8,64  11     2948    33.779661791 90790  U   N [fio] 1
+  8,64  11     2949    33.779662409 90790  D   W 7614344 + 24 [fio]
+  8,64  11     2950    33.791580458     0  C   W 7614344 + 24 [0]
+  8,64  11     2951    33.791608964 90790  Q  WS 7614368 + 8 [fio]
+  8,64  11     2952    33.791609940 90790  G  WS 7614368 + 8 [fio]
+  8,64  11     2953    33.791610381 90790  P   N [fio]
+  8,64  11     2954    33.791611867 90790  I  WS 7614368 + 8 [fio]
+  8,64  11     2955    33.791612372 90790  U   N [fio] 1
+  8,64  11     2956    33.791612977 90790  D  WS 7614368 + 8 [fio]
+  8,64  11     2957    33.799933777     0  C  WS 7614368 + 8 [0]
+  8,64  13     5709    33.799963426 90708  Q  WS 3905206216 + 8 [jbd2/sde-8]
+  8,64  13     5710    33.799964662 90708  G  WS 3905206216 + 8 [jbd2/sde-8]
+  8,64  13     5711    33.799965100 90708  P   N [jbd2/sde-8]
+  8,64  13     5712    33.799965942 90708  Q  WS 3905206224 + 8 [jbd2/sde-8]
+  8,64  13     5713    33.799966423 90708  M  WS 3905206224 + 8 [jbd2/sde-8]
+  8,64  13     5714    33.799967148 90708  Q  WS 3905206232 + 8 [jbd2/sde-8]
+
+......
+
+CPU8 (sde):
+ Reads Queued:           0,        0KiB  Writes Queued:         195,   29,228KiB
+ Read Dispatches:        0,        0KiB  Write Dispatches:      170,   29,228KiB
+ Reads Requeued:         0               Writes Requeued:         0
+ Reads Completed:        0,        0KiB  Writes Completed:      170,   29,228KiB
+ Read Merges:            0,        0KiB  Write Merges:           25,      100KiB
+ Read depth:             0               Write depth:            20
+ IO unplugs:           104               Timer unplugs:           0
+CPU9 (sde):
+ Reads Queued:           0,        0KiB  Writes Queued:         991,   16,156KiB
+ Read Dispatches:        0,        0KiB  Write Dispatches:      574,   16,156KiB
+ Reads Requeued:         0               Writes Requeued:         0
+ Reads Completed:        0,        0KiB  Writes Completed:      574,   16,156KiB
+ Read Merges:            0,        0KiB  Write Merges:          417,    1,668KiB
+ Read depth:             0               Write depth:            20
+ IO unplugs:           346               Timer unplugs:           0
+......
+Total (sde):
+ Reads Queued:           0,        0KiB  Writes Queued:       8,763,  352,192KiB
+ Read Dispatches:        0,        0KiB  Write Dispatches:    5,380,  352,192KiB
+ Reads Requeued:         0               Writes Requeued:         0
+ Reads Completed:        0,        0KiB  Writes Completed:    5,380,  352,196KiB
+ Read Merges:            0,        0KiB  Write Merges:        3,383,   13,532KiB
+ IO unplugs:         3,092               Timer unplugs:           0
+
+Throughput (R/W): 0KiB/s / 5,872KiB/s
+Events (sde): 39,850 entries
+Skips: 0 forward (0 -   0.0%)
+```
+
+我们尝试把一个特定request的事件给找出来(grep一个特定的起始sector号，而不是grep一个序列号):
+
+```
+# blkparse -i sde | grep -w 7614368
+  8,64  11     2951    33.791608964 90790  Q  WS 7614368 + 8 [fio]
+  8,64  11     2952    33.791609940 90790  G  WS 7614368 + 8 [fio]
+  8,64  11     2954    33.791611867 90790  I  WS 7614368 + 8 [fio]
+  8,64  11     2956    33.791612977 90790  D  WS 7614368 + 8 [fio]
+  8,64  11     2957    33.799933777     0  C  WS 7614368 + 8 [0]
+```
+
+这是一个Write+Sync请求，起始sector是7614368，大小是8个secotr(即4k)。它是一个典型的request：经历了`Q->G->I->D-C`几个阶段，总耗时：33.799933777-33.791608964 = 8324813纳秒 = 8.3毫秒。
+
+Summary部分，可以看到各个read指标都为0，因为fio全是写操作且大小和文件系统block对齐。可以对比还是全写操作但bs=5k(不再和文件系统block对齐)的情形，这时候read指标就不为0了，因为不对齐，文件系统需要把部分修改的block读出来，修改然后再写回去。
+
+**例2**：把/dev/sde(设备号:8,64)分区并把/dev/sde2(设备号:8,66)格式化成ext4，挂载到/mnt并使用fio写/mnt/fio-test-file (rw=randwrite ioengine=psync bs=4k fsync=1)，同时还是trace /dev/sde
+
+前面部分类似，我们还是看一个request:
+
+```
+# blkparse -i sde | grep -w 3927579616
+  8,64  20     1160    21.225404128 98523  A  WS 3927579616 + 8 <- (8,66) 20560864
+  8,64  20     1161    21.225405121 98523  Q  WS 3927579616 + 8 [fio]
+  8,64  20     1162    21.225407092 98523  G  WS 3927579616 + 8 [fio]
+  8,64  20     1164    21.225409225 98523  I  WS 3927579616 + 8 [fio]
+  8,64  20     1166    21.225411107 98523  D  WS 3927579616 + 8 [fio]
+  8,64   0     1176    21.238455782     0  C  WS 3927579616 + 8 [0]
+```
+
+和例1相比，这个request多了一个`A`事件，因为这个IO是从/dev/sde2(设备号:8,66)remap到/dev/sde(设备号:8,64)的。总耗时21.238455782-21.225404128 = 13051654纳秒 - 13毫秒。
+
+通过这两个例子我们可以看出，blktrace可以追踪到一个特定request的各个阶段，及各个阶段的耗时。但这太详细了，我们无法逐一查看各个request。这时`btt`命令就派上用场了，它可以生成报表。blkparse还有一个功能：把blktrace生成的`{device}.blktrace.{cpu}`一堆文件dump成一个二进制文件，输出到`-d`指定的文件中。这个功能正好方便`btt`的使用。
+
+```
+# blkparse -i sde -d sde.blktrace.bin
+# ls sde.blktrace.bin
+sde.blktrace.bin
+```
+
+# 使用btt生成报表 (5)
+
+- Q2Q: time between requests sent to the block layer
+- Q2G: time from a block I/O is queued to the time it gets a request allocated for it
+- G2I: time from a request is allocated to the time it is Inserted into the device's queue
+- Q2M: time from a block I/O is queued to the time it gets merged with an existing request
+- I2D: time from a request is inserted into the device's queue to the time it is actually issued to the device
+- M2D: time from a block I/O is merged with an exiting request until the request is issued to the device
+- D2C: service time of the request by the device
+- Q2C: total time spent in the block layer for a request
