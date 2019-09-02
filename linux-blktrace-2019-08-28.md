@@ -9,6 +9,16 @@ categories: linux
 
 <!-- more -->
 
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+});
+</script>
+
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
 # blktrace简介 (1)
 
 blktrace是block层的trace机制，它可以跟踪IO请求的生成、进入队列、发到driver以及完成等事件。blktrace包含3个组件：
@@ -356,7 +366,7 @@ Q2C               0.001753524   0.013120242   0.103761266        7557
 All Devices部分显示了各个阶段的最小、平均及最大耗时，单位是秒。阶段的定义见第5.1节。Device Overhead部分显示了几个重要阶段在总耗时中的占比。Overall是所有被trace的设备的总体情况，我们只trace了一个设备（major,minor设备号为8,64），所以Overall这一行和（8, 64）这一样一样。在这个例子中，主要耗时是**D2C**阶段（正常情况就是这样）：
 
 
-$$\frac{Avg D2C}{Avg Q2C} = \frac{0.013116498}{0.013120242} = 0.999715 = 99.9715%$$
+$$ \frac{AVG D2C}{AVG Q2C} = \frac{0.013116498}{0.013120242} = 99.9715\%$$
 
 
 ```
