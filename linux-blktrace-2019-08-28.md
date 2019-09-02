@@ -68,13 +68,9 @@ IO发起之后，主要会经历以下阶段(事件)：
 * P: plug. request进来的时候，device的队列为空，plug直到一定数量的request进来，或超时。
 * U: unplug. 一定数量的request进来，或超时，unplug队列。
 
-所以，一个完整的IO流程是：
+下图粗略显示一个IO的流程。左边是比较详细，其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。所以，右边是典型的IO流程。
 
-<div align=center>![IO流程](io-flow-1.jpg)
-
-其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。所以，最典型的IO流程是：
-
-<div align=center>![简化的IO流程](io-flow-2.jpg)
+<div align=center>![IO流程](io-flow-merge.jpg)
 
 # 使用blktrace导出原始数据 (3)
 
@@ -249,7 +245,25 @@ Summary部分，可以看到各个read指标都为0，因为fio全是写操作�
 
 和例1相比，这个request多了一个`A`事件，因为这个IO是从/dev/sde2(设备号:8,66)remap到/dev/sde(设备号:8,64)的。总耗时21.238455782-21.225404128 = 13051654纳秒 - 13毫秒。
 
-通过这两个例子我们可以看出，blktrace可以追踪到一个特定request的各个阶段，及各个阶段的耗时。但这太详细了，我们无法逐一查看各个request。这时`btt`命令就派上用场了，它可以生成报表。blkparse还有一个功能：把blktrace生成的`{device}.blktrace.{cpu}`一堆文件dump成一个二进制文件，输出到`-d`指定的文件中。这个功能正好方便`btt`的使用。
+**例3**：基于例2的数据，我们找一个merge的请求:
+
+```
+# blkparse -i sde | grep -w M
+  ......
+  8,64  13     4417    59.166019679 96519  M  WS 5857801416 + 8 [jbd2/sde2-8]
+  8,64  13     4434    59.194332313 96519  M  WS 5857801440 + 8 [jbd2/sde2-8]
+  8,64  13     4451    59.232388528 96519  M  WS 5857801464 + 8 [jbd2/sde2-8]
+  ......
+
+# blkparse -i sde | grep -w 5857801440
+  8,64  13     4432    59.194331558 96519  A  WS 5857801440 + 8 <- (8,66) 1950782688
+  8,64  13     4433    59.194331878 96519  Q  WS 5857801440 + 8 [jbd2/sde2-8]
+  8,64  13     4434    59.194332313 96519  M  WS 5857801440 + 8 [jbd2/sde2-8]
+```
+
+这个请求从remap到queued，然后merge到一个已存在的请求中，之后便追踪不到了：因为它是其他某个请求的一部分，而不是一个独立的请求。假如知道它被merge到哪个请求了，去追踪那个请求，就能知道后续各个阶段。另外注意，被合并的情况下，没有get request (G)阶段，而直接被合并了（参考第2节结尾的IO流程图）。
+
+通过这三个例子我们可以看出，blktrace可以追踪到一个特定request的各个阶段，及各个阶段的耗时。但这太详细了，我们无法逐一查看各个request。这时`btt`命令就派上用场了，它可以生成报表。blkparse还有一个功能：把blktrace生成的`{device}.blktrace.{cpu}`一堆文件dump成一个二进制文件，输出到`-d`指定的文件中（忽略标准输出）。这个功能正好方便`btt`的使用。
 
 ```
 # blkparse -i sde -d sde.blktrace.bin
@@ -259,6 +273,14 @@ sde.blktrace.bin
 
 # 使用btt生成报表 (5)
 
+# 阶段定义 (5.1)
+
+我们再用一个图表示各个阶段的时延：
+
+<div align=center>![阶段图](blktrace-stags.jpg)
+
+其中各个阶段的定义如下：
+
 - Q2Q: time between requests sent to the block layer
 - Q2G: time from a block I/O is queued to the time it gets a request allocated for it
 - G2I: time from a request is allocated to the time it is Inserted into the device's queue
@@ -267,3 +289,223 @@ sde.blktrace.bin
 - M2D: time from a block I/O is merged with an exiting request until the request is issued to the device
 - D2C: service time of the request by the device
 - Q2C: total time spent in the block layer for a request
+
+注意以下两点：
+- Q2Q是表示两个reqeusts之间的间隔；而其他都是表示一个request的各个阶段的间隔。
+- 上面绿色部分表示一个典型request（没有被merge的request）特有的阶段；下面红色表示一个被merge的request特有的阶段；黄色部分表示公共阶段。
+
+# btt的默认输出 (5.2)
+
+以第2节中例2的数据为例，btt最简单的使用方式如下：
+
+```
+# btt -i sde.blktrace.bin -o bttout
+# ll
+total 2388
+-rw-r--r-- 1 root root     362 Sep  2 22:06 8,64_iops_fp.dat
+-rw-r--r-- 1 root root     710 Sep  2 22:06 8,64_mbps_fp.dat
+-rw-r--r-- 1 root root    3468 Sep  2 22:06 bttout.avg
+-rw-r--r-- 1 root root   17023 Sep  2 22:06 bttout.dat
+-rw-r--r-- 1 root root    7220 Sep  2 22:06 bttout_dhist.dat
+-rw-r--r-- 1 root root       0 Sep  2 22:06 bttout.msg
+-rw-r--r-- 1 root root    7236 Sep  2 22:06 bttout_qhist.dat
+-rw-r--r-- 1 root root 2387128 Sep  2 22:06 sde.blktrace.bin
+-rw-r--r-- 1 root root     362 Sep  2 22:06 sys_iops_fp.dat
+-rw-r--r-- 1 root root     710 Sep  2 22:06 sys_mbps_fp.dat
+```
+
+btt的输入`-i`是blkparse生成（dump）的二进制文件（见第4节），默认输出包括：
+
+- 标准输出：很多信息，下面细说。
+- `{major,minor设备号}_iops_fp.dat`：包含两列，第一列为时间（以秒为单位，从第0秒开始）；第二列为IOPS；
+- `{major,minor设备号}_mbps_fp.dat`：包含两列，第一列为时间（以秒为单位，从第0秒开始）；第二列为带宽，即MB/s；
+- `sys_iops_fp.dat`：只trace一个设备的时候，和`{major,minor设备号}_iops_fp.dat`一样（两个文件的MD5相同）。
+- `sys_mbps_fp.dat`：只trace一个设备的时候，和`{major,minor设备号}_mbps_fp.dat`一样（两个文件的MD5相同）
+
+其中标准输出很多，把屏幕搞的很乱，看不清主要信息。为此，我们加一个`-o bttout`选项，这时屏幕上就没有任何信息，但生成以下四个文件：
+
+- **bttout.avg**
+
+这个输出文件最重要，里面包含各种统计信息，我们逐一解读（数据来自于第2节中的例2）：
+
+```
+==================== All Devices ====================
+
+            ALL           MIN           AVG           MAX           N
+--------------- ------------- ------------- ------------- -----------
+
+Q2Q               0.000000915   0.007937919   0.103788139        7557
+Q2G               0.000000410   0.000001214   0.000030594        5707
+G2I               0.000000278   0.000001805   0.000033501        5707
+Q2M               0.000000164   0.000000498   0.000014527        1851
+I2D               0.000000308   0.000001078   0.000002753        5707
+M2D               0.000001169   0.000002162   0.000032612        1851
+D2C               0.001751673   0.013116498   0.103759327        7557
+Q2C               0.001753524   0.013120242   0.103761266        7557
+```
+
+这一段不赘述，见第5.1节即可。
+
+```
+==================== Device Overhead ====================
+
+       DEV |       Q2G       G2I       Q2M       I2D       D2C
+---------- | --------- --------- --------- --------- ---------
+ (  8, 64) |   0.0070%   0.0104%   0.0009%   0.0062%  99.9715%
+---------- | --------- --------- --------- --------- ---------
+   Overall |   0.0070%   0.0104%   0.0009%   0.0062%  99.9715%
+```
+
+
+```
+==================== Device Merge Information ====================
+
+       DEV |       #Q       #D   Ratio |   BLKmin   BLKavg   BLKmax    Total
+---------- | -------- -------- ------- | -------- -------- -------- --------
+ (  8, 64) |     7558     5707     1.3 |        8      118     1024   678184
+```
+
+
+```
+==================== Device Q2Q Seek Information ====================
+
+       DEV |          NSEEKS            MEAN          MEDIAN | MODE
+---------- | --------------- --------------- --------------- | ---------------
+ (  8, 64) |            7558     894100249.2               0 | 0(3937)
+---------- | --------------- --------------- --------------- | ---------------
+   Overall |          NSEEKS            MEAN          MEDIAN | MODE
+   Average |            7558     894100249.2               0 | 0(3937)
+
+
+
+==================== Device D2D Seek Information ====================
+
+       DEV |          NSEEKS            MEAN          MEDIAN | MODE
+---------- | --------------- --------------- --------------- | ---------------
+ (  8, 64) |            5707    1184091411.0               0 | 0(2086)
+---------- | --------------- --------------- --------------- | ---------------
+   Overall |          NSEEKS            MEAN          MEDIAN | MODE
+   Average |            5707    1184091411.0               0 | 0(2086)
+```
+
+
+```
+==================== Plug Information ====================
+
+       DEV |    # Plugs # Timer Us  | % Time Q Plugged
+---------- | ---------- ----------  | ----------------
+ (  8, 64) |       3402(         0) |   0.014552920%
+
+       DEV |    IOs/Unp   IOs/Unp(to)
+---------- | ----------   ----------
+ (  8, 64) |        1.0          0.0
+---------- | ----------   ----------
+   Overall |    IOs/Unp   IOs/Unp(to)
+   Average |        1.0          0.0
+```
+
+
+```
+==================== Active Requests At Q Information ====================
+
+       DEV |  Avg Reqs @ Q
+---------- | -------------
+ (  8, 64) |           0.2
+```
+
+
+```
+==================== I/O Active Period Information ====================
+
+       DEV |     # Live      Avg. Act     Avg. !Act % Live
+---------- | ---------- ------------- ------------- ------
+ (  8, 64) |       4925   0.012143126   0.000036958  99.70
+---------- | ---------- ------------- ------------- ------
+ Total Sys |       4925   0.012143126   0.000036958  99.70
+```
+
+- **bttout.dat**
+
+```
+# Total System
+#     Total System : q activity
+  0.000042623   0.0
+  0.000042623   0.4
+ 53.325061811   0.4
+ ......
+
+#     Total System : c activity
+  0.013872226   0.5
+  0.013872226   0.9
+ 59.986877686   0.9
+ ......
+
+# Per process
+#  {user-process-name} : q activity
+
+#  {user-process-name} : c activity
+ 23.098077380   1.5
+ 23.098077380   1.9
+ ......
+
+#     ext4lazyinit : q activity
+  0.171033385   2.0
+  0.171033385   2.4
+  ......
+
+#     ext4lazyinit : c activity
+
+#              fio : q activity
+  0.022288457   3.0
+  0.022288457   3.4
+  ......
+
+#              fio : c activity
+
+#             jbd2 : q activity
+  0.000042623   5.0
+  0.000042623   5.4
+ ......
+
+#             jbd2 : c activity
+
+#           kernel : q activity
+
+#           kernel : c activity
+  0.013872226   6.5
+  0.013872226   6.9
+  ......
+
+#          kworker : q activity
+  4.219029550   7.0
+  4.219029550   7.4
+  4.219035624   7.4
+  4.219035624   7.0
+  ......
+
+#          kworker : c activity
+```
+
+- **bttout_dhist.dat**
+
+```
+# D buckets
+   1 0
+   2 0
+   3 0
+   4 0
+   ......
+1022 0
+1023 0
+1024 608
+
+# D bucket for > 1024
+1024 0
+```
+
+
+- **bttout.msg**
+
+- **bttout_qhist.dat**
+
+
