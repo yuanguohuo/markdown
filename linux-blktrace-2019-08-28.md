@@ -68,7 +68,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 * D: issued. IO scheduler中的请求被发送到driver。
 * C: complete. 发送到driver中的请求已经完成了。这个事件会描述IO的初始sector和size(位置和大小)，以及是成功还是失败。
 
-其中阶段I(inserted)可能被合并取代，也就是说，不是作为一个独立的request被发送到IO scheduler，而是合并到已经处于IO scheduler中的某个request中。
+其中阶段G(get request)和I(inserted)可能被merge取代，也就是说，不是作为一个独立的request被发送到IO scheduler，而是合并到已经处于IO scheduler中的某个request中，这种情况下，不用分配request对象(G:get request)。
 
 * M: back merge. 当前请求被合并到已存在于IO scheduler中的某个请求之后。
 * F: front merge. 当前请求被合并到已存在于IO scheduler中的某个请求之前。
@@ -368,6 +368,17 @@ All Devices部分显示了各个阶段的最小、平均及最大耗时，单位
 
 $$ \frac{AVG D2C}{AVG Q2C} = \frac{0.013116498}{0.013120242} = 99.9715\%$$
 
+另外，All Devices部分的最后一列显示了**各个事件的个数**。参考第2节的IO流程图和第5.1节的阶段图，我们知道一个request
+
+- 要么被合并到另一个request，经历路径：`Q->M->D`
+- 要么作为独立的请求进入device driver，经历路径：`Q->G->I->D`
+
+所以，这两条路径上的请求数加起来应该等于总数，即：
+
+$$ N(Q2M) + N(Q2G) = N(D2C) $$
+$$ N(Q2G) = N(G2I) = N(I2D) $$
+$$ N(Q2M) = N(M2D) $$
+$$ N(Q2Q) = N(D2C) = N(Q2C) $$
 
 ```
 ==================== Device Merge Information ====================
