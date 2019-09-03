@@ -386,7 +386,7 @@ Disk stats (read/write):
 |Yes      |Filesystem                  |132                |33       |33.81                 |
 |No       |Filesystem                  |44                 |11       |89.16                 |
 
-很明显，不对齐的时候，无论是裸分区还好文件系统，性能都降低至对齐的1/3。值得一提的是，测裸分区时，若使用ioengine=libaio, direct=1，则对齐与不对齐差别不大，原因是没强制sync，磁盘firmware可能对齐后再写到盘片。
+很明显，不对齐的时候，无论是裸分区还是文件系统，性能都降低至对齐的1/3。值得一提的是，测裸分区时，若使用ioengine=libaio, direct=1，则对齐与不对齐差别不大，原因是没强制sync，磁盘firmware可能对齐后再写到盘片。
 
 # 小结 (5)
 
