@@ -1,7 +1,7 @@
 ﻿---
 title: Advanced Format Disks 
 date: 2019-09-03 20:20:13
-tags: [disk,advanced format]
+tags: [disk]
 categories: disk 
 ---
 
