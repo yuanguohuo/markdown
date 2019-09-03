@@ -5,7 +5,7 @@ tags: [linux,blktrace]
 categories: linux 
 ---
 
-[iostat](http://www.yuanguohuo.com/2019/08/17/linux-iostat/)可以获取到特定device的IO请求信息，如read/write数，合并数，request size，**等待时间**等。但这些都是基于device统计的，我们无法获取到基于IO的详细信息，特别是**等待时间**都花在哪里了？比如多少时间是在IO scheduler中排队，从发送到device driver到完成又是多少时间。blktrace可以提供这些信息。
+[iostat](http://www.yuanguohuo.com/2019/08/17/linux-iostat/)可以获取到特定device的IO请求信息，如read/write数，合并数，request size，**等待时间**等。但这些都是基于device统计的，我们无法获取到基于IO的详细信息，特别是**等待时间**都花在哪里了？比如多少时间是在IO scheduler（device的queue）中排队，从发送到device driver到完成又是多少时间。blktrace可以提供这些信息。
 
 <!-- more -->
 
@@ -31,7 +31,7 @@ blktrace是block层的trace机制，它可以跟踪IO请求的生成、进入队
 
 - blktrace从kernel接收数据并通过debug file system的buffer传递到用户态；debug file system默认是/sys/kernel/debug，可以使用blktrace命令的`-r`选项来覆盖。buffer的大小和数量默认是512KiB和4，可以通过`-b`和`-n`来覆盖。blktrace运行的的时候，可以看见debug file system里有一个block/{device}(默认是/sys/kernel/debug/block/{device})目录被创建出来，里面有一些trace{cpu}文件。
 - blktrace默认地搜集所有trace到的事件，可以使用blktrace命令的`-a`选项来mask。
-- blktrace把从内核接收到的数据写到当前目录，格式是`{device}.blktrace.{cpu}`。例如`blktrace -d /dev/sdc`会生成sdc.blktrace.0, sdc.blktrace.1, ... sdc.blktrace.N-1个文件，N为cpu数。也可使用`-o`选项来自定义`{device}`部分，这方便和blkparse结合使用：blktrace的`-o`参数对应blkparse的`-i`参数。
+- blktrace把从内核接收到的数据写到当前目录，文件名为`{device}.blktrace.{cpu}`，内容是二进制数据（blkparse用于解析这些二进制数据）。例如`blktrace -d /dev/sdc`会生成sdc.blktrace.0, sdc.blktrace.1, ... sdc.blktrace.N-1个文件，N为cpu数。也可使用`-o`选项来自定义`{device}`部分，这方便和blkparse结合使用：blktrace的`-o`参数对应blkparse的`-i`参数。
 - blktrace默认地会一直运行，直到被`ctrl-C`停掉。可以使用`-w`选项来指定运行时间，单位是秒。
 
 blktrace会区分两类请求:
@@ -64,16 +64,16 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 * Q: queued. request尚未生成，只是queue到指定的位置(不清楚)。
 * G: get request. 分配一个`struct request`实例，生成request。
-* I: inserted. request被发送到IO scheduler。
-* D: issued. IO scheduler中的请求被发送到driver。
+* I: inserted. request被发送到IO scheduler（device的queue）。
+* D: issued. IO scheduler（device的queue）中的请求被发送到driver。
 * C: complete. 发送到driver中的请求已经完成了。这个事件会描述IO的初始sector和size(位置和大小)，以及是成功还是失败。
 
-其中阶段G(get request)和I(inserted)可能被merge取代，也就是说，不是作为一个独立的request被发送到IO scheduler，而是合并到已经处于IO scheduler中的某个request中，这种情况下，不用分配request对象(G:get request)。
+其中阶段G(get request)和I(inserted)可能被merge取代，也就是说，不是作为一个独立的request被发送到IO scheduler（device的queue），而是合并到已经处于IO scheduler中的某个request中，这种情况下，不用分配request对象(G:get request)。
 
-* M: back merge. 当前请求被合并到已存在于IO scheduler中的某个请求之后。
-* F: front merge. 当前请求被合并到已存在于IO scheduler中的某个请求之前。
+* M: back merge. 当前请求被合并到已存在于IO scheduler（device的queue）中的某个请求之后。
+* F: front merge. 当前请求被合并到已存在于IO scheduler（device的queue）中的某个请求之前。
 
-另外，一个请求还可能经历plug和unplug阶段。在I(inserted)之后D(issued)之前，即在IO scheduler中，若一个request到来的时候，device的队列为空，linux会plug这个队列(即堵住队列的出口)一段时间，期待有更多的request进来(这样可以合并？)。当队列中有一定数量的request之后，或者等待超时，linux就会unplug(打开队列出口，可以从IO scheduler出去进入driver)这个队列。
+另外，一个请求还可能经历plug和unplug阶段。在I(inserted)之后D(issued)之前，即在IO scheduler（device的queue）中，若一个request到来的时候，device的队列为空，linux会plug这个队列(即堵住队列的出口)一段时间，期待有更多的request进来(这样可以合并？)。当队列中有一定数量的requests之后，或者等待超时，linux就会unplug这个队列(打开队列出口，可以从IO scheduler出去，进入driver)。
 
 * P: plug. request进来的时候，device的队列为空，plug直到一定数量的request进来，或超时。
 * U: unplug. 一定数量的request进来，或超时，unplug队列。
@@ -477,6 +477,7 @@ $$ Ratio = \frac{N_Q}{N_D} $$
    Average |            5707    1184091411.0               0 | 0(2086)
 ```
 
+这部分是seek距离的统计。默认情况下，seek距离是按"closeness"方式统计的，即当前IO和前一个IO的seek距离是：min{当前IO的起点和前一个IO的终点的距离，当前IO的终点和前一个IO的起点的距离}。可以使用btt的`-a`(--seek-absolute)选项改变这个方式，即改成绝对seek距离：前一个IO的终点和当前IO的起点的距离。
 
 ```
 ==================== Plug Information ====================
@@ -500,7 +501,6 @@ $$ Ratio = \frac{N_Q}{N_D} $$
 ---------- | -------------
  (  8, 64) |           0.2
 ```
-
 
 ```
 ==================== I/O Active Period Information ====================
