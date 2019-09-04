@@ -108,7 +108,7 @@ notify: trace messages
 drv_data: additional driver specific trace
 ```
 
-例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**并**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，只需`-d`和`-w`选项，例如，在一个32核的服务器上trace设备/dev/sde：
+例如，`-a write`过滤写事件；`-a sync`过滤sync事件。多个`-a`选项是**逻辑与**的关系。一般情况下，blktrace不用指定mask，而是把所有的事件都trace下来。blkparse有同样的`-a`选项，可以使用它来指定只解析某些事件，这可以提供更大的灵活性：trace时把全信息保存下来，然后通过mask按需解析不同事件。当然，影响性能的时候除外。所以，通常在**事后处理**模式下，只需`-d`和`-w`选项，例如，在一个32核的服务器上trace设备/dev/sde：
 
 ```
 # blktrace -d /dev/sde -w 60
@@ -170,11 +170,11 @@ Summary包括CPU和device两个维度:
 - Writes Completed：trace时间内，完成的requests数；
 - Timer unplugs：超时导致的unplug数？
 
-`Writes Queued`和`Writes Requeued`之和，是trace时间内block layer接到的requests总数（incomming requests）；`Write Dispatches`是block layer发送到driver的requests数（outgoing requests）。Incomming requests和outgoing requests之差，即是合并数。所以：
+$Writes Queued$与$Writes Requeued$之和，是trace时间内block layer接到的requests总数（incomming requests）；$Write Dispatches$是block layer发送到driver的requests数（outgoing requests）。Incomming requests和outgoing requests之差，即是合并数。所以：
 
 $$ Writes Queued + Writes Requeued - Write Dispatches = Write Merges $$
 
-`Write Dispatches`是block layer发送到driver的requests数，但不是所有发送到driver的都完成了，其中有一部分被requeue了，即：
+$Write Dispatches$是block layer发送到driver的requests数，但不是所有发送到driver的都完成了，其中有一部分被requeue了，即：
 
 $$ Write Dispatches = Writes Completed + Writes Requeued $$
 
