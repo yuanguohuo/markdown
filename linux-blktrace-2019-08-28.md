@@ -73,7 +73,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 * M: back merge. 当前请求被合并到已存在于IO scheduler（device的queue）中的某个请求之后。
 * F: front merge. 当前请求被合并到已存在于IO scheduler（device的queue）中的某个请求之前。
 
-另外，一个请求还可能经历plug和unplug阶段。在I(inserted)之后D(issued)之前，即在IO scheduler（device的queue）中，若一个request到来的时候，device的队列为空，linux会plug这个队列(即堵住队列的出口)一段时间，期待有更多的request进来(这样可以合并？)。当队列中有一定数量的requests之后，或者等待超时，linux就会unplug这个队列(打开队列出口，可以从IO scheduler出去，进入driver)。
+另外，一个请求还可能经历plug和unplug阶段。在I(inserted)之后，D(issued)之前，即在IO scheduler（device的queue）中，若一个request到来的时候，device的queue为空，linux会plug这个队列(即堵住队列的出口)一段时间，期待有更多的request进来(这样可以合并？)。当队列中有一定数量的requests之后，或者等待超时，linux就会unplug这个队列(打开队列出口，request开始从IO scheduler出去，进入driver)。
 
 * P: plug. request进来的时候，device的队列为空，plug直到一定数量的request进来，或超时。
 * U: unplug. 一定数量的request进来，或超时，unplug队列。
@@ -165,7 +165,7 @@ Summary包括CPU和device两个维度:
 其中对于每个CPU或者对于Total：
 - Writes Queued：trace时间内，Q(queue)的requests个数；
 - Writes Requeued：trace时间内，requeue数。requeue可能来自于multi-layer？
-- Write Dispatches：trace时间内，block layer发送到driver的requests数。`Writes Queued`和`Write Dispatches`的差，反映出merge数；
+- Write Dispatches：trace时间内，block layer发送到driver的requests数；
 - Write Merges：trace时间内，merge的requests数；
 - Writes Completed：trace时间内，完成的requests数；
 - Timer unplugs：超时导致的unplug数？
