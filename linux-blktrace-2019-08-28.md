@@ -351,9 +351,10 @@ sde.blktrace.bin
 - D2C: service time of the request by the device
 - Q2C: total time spent in the block layer for a request
 
-注意以下两点：
+注意以下几点：
 - Q2Q是表示两个reqeusts之间的间隔；而其他都是表示一个request的各个阶段的间隔。
 - 上面绿色部分表示一个典型request（没有被merge的request）特有的阶段；下面红色表示一个被merge的request特有的阶段；黄色部分表示公共阶段。
+- Q2G一般比较小，若它比较大，说明分配不到`struct request`，中途经历了S(sleep)阶段。
 
 ## btt的默认输出 (5.2)
 
