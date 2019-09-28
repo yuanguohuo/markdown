@@ -68,10 +68,14 @@ IO发起之后，主要会经历以下阶段(事件)：
 * D: issued. IO scheduler（device的queue）中的请求被发送到driver。
 * C: complete. 发送到driver中的请求已经完成了。这个事件会描述IO的初始sector和size(位置和大小)，以及是成功还是失败。
 
-其中阶段G(get request)和I(inserted)可能被merge取代，也就是说，不是作为一个独立的request被发送到IO scheduler（device的queue），而是合并到已经处于IO scheduler中的某个request中，这种情况下，不用分配request对象(G:get request)。
+首先，`Q->G`之间可能有一个S(sleep)阶段：
 
-* M: back merge. 当前请求被合并到已存在于IO scheduler（device的queue）中的某个请求之后。
-* F: front merge. 当前请求被合并到已存在于IO scheduler（device的queue）中的某个请求之前。
+* S: 系统没有可用的`struct request`实例，所以需要等待别的实例被释放。
+
+其次，`S-G->I`这一过程可能被merge取代，也就是说，请求不是作为一个独立的`struct request`进入IO scheduler（device的queue），而是合并到IO scheduler中的某个`struct request`中；在这种情况下，不用分配`struct request`实例。
+
+* M: back merge. 当前请求被合并到IO scheduler（device的queue）中的某个请求之后。
+* F: front merge. 当前请求被合并到IO scheduler（device的queue）中的某个请求之前。
 
 另外，一个请求还可能经历plug和unplug阶段。在I(inserted)之后，D(issued)之前，即在IO scheduler（device的queue）中，若一个request到来的时候，device的queue为空，linux会plug这个队列(即堵住队列的出口)一段时间，期待有更多的request进来(这样可以合并？)。当队列中有一定数量的requests之后，或者等待超时，linux就会unplug这个队列(打开队列出口，request开始从IO scheduler出去，进入driver)。
 
