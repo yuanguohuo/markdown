@@ -176,11 +176,11 @@ Summary包括CPU和device两个维度:
 
 $Writes Queued$与$Writes Requeued$之和是trace时间内block layer接收的requests总数（incomming requests）。$Write Dispatches$和$Write Merges之和是trace时间内block layer发出的（到driver）requests数（outgoing requests）。进等于出，所以：
 
-- $$ Writes Queued + Writes Requeued = Write Dispatches + Write Merges $$
+$$ Writes Queued + Writes Requeued = Write Dispatches + Write Merges $$
 
 $Write Dispatches$是block layer发送到driver的requests数，但不是所有发送到driver的都完成了，其中有一部分被requeue了，即：
 
-- $$ Write Dispatches = Writes Completed + Writes Requeued $$
+$$ Write Dispatches = Writes Completed + Writes Requeued $$
 
 **例1**：把/dev/sde(设备号:8,64)整个盘格式化成ext4，挂载到/mnt并使用fio写/mnt/fio-test-file (rw=randwrite ioengine=psync bs=4k fsync=1)，同时trace /dev/sde
 
