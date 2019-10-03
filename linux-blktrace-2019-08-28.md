@@ -27,11 +27,11 @@ blktrace是block层的trace机制，它可以跟踪IO请求的生成、进入队
 - 一个把内核模块跟踪到的IO信息导出到用户态的工具(blktrace命令)
 - 一些分析和展示IO信息的工具(blkparse, btt命令)
 
-所以广义的blktrace包含这3个部分，狭义的blktrace只是值blktrace命令。本文介绍广义的blktrace：包括使用blktrace命令导出IO信息，然后使用blkparse和btt分析展示。blktrace命令通过 debug file system 从内核导出数据：
+所以广义的blktrace包含这3个部分，狭义的blktrace只是blktrace命令。本文介绍广义的blktrace：包括使用blktrace命令导出IO信息，然后使用blkparse和btt分析展示。blktrace命令通过 debug file system 从内核导出数据：
 
 - blktrace从kernel接收数据并通过debug file system的buffer传递到用户态；debug file system默认是/sys/kernel/debug，可以使用blktrace命令的`-r`选项来覆盖。buffer的大小和数量默认是512KiB和4，可以通过`-b`和`-n`来覆盖。blktrace运行的的时候，可以看见debug file system里有一个block/{device}(默认是/sys/kernel/debug/block/{device})目录被创建出来，里面有一些trace{cpu}文件。
-- blktrace默认地搜集所有trace到的事件，可以使用blktrace命令的`-a`选项来mask。
-- blktrace把从内核接收到的数据写到当前目录，文件名为`{device}.blktrace.{cpu}`，内容是二进制数据（blkparse用于解析这些二进制数据）。例如`blktrace -d /dev/sdc`会生成sdc.blktrace.0, sdc.blktrace.1, ... sdc.blktrace.N-1个文件，N为cpu数。也可使用`-o`选项来自定义`{device}`部分，这方便和blkparse结合使用：blktrace的`-o`参数对应blkparse的`-i`参数。
+- blktrace默认地搜集所有trace到的事件，可以使用blktrace命令的`-a`选项来指定事件。
+- blktrace把从内核接收到的数据写到当前目录，文件名为`{device}.blktrace.{cpu}`，内容是二进制数据（对于人来说是不可读的；blkparse用于解析这些二进制数据）。例如`blktrace -d /dev/sdc`会生成sdc.blktrace.0, sdc.blktrace.1, ... sdc.blktrace.N-1个文件，N为cpu个数。也可使用`-o`选项来自定义`{device}`部分，这方便和blkparse结合使用：blktrace的`-o`参数对应blkparse的`-i`参数。
 - blktrace默认地会一直运行，直到被`ctrl-C`停掉。可以使用`-w`选项来指定运行时间，单位是秒。
 
 blktrace会区分两类请求:
@@ -70,7 +70,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 首先，`Q->G`之间可能有一个S(sleep)阶段：
 
-* S: 系统没有可用的`struct request`实例，所以需要等待别的实例被释放。
+* S: sleep. 系统没有可用的`struct request`实例，所以需要等待别的实例被释放。
 
 其次，`S-G->I`这一过程可能被merge取代，也就是说，请求不是作为一个独立的`struct request`进入IO scheduler（device的queue），而是合并到IO scheduler中的某个`struct request`中；在这种情况下，不用分配`struct request`实例。
 
@@ -174,13 +174,13 @@ Summary包括CPU和device两个维度:
 - Writes Completed：trace时间内，完成的requests数；
 - Timer unplugs：超时导致的unplug数？
 
-$Writes Queued$与$Writes Requeued$之和，是trace时间内block layer接到的requests总数（incomming requests）；$Write Dispatches$是block layer发送到driver的requests数（outgoing requests）。Incomming requests和outgoing requests之差，即是合并数。所以：
+$Writes Queued$与$Writes Requeued$之和是trace时间内block layer接收的requests总数（incomming requests）。$Write Dispatches$和$Write Merges之和是trace时间内block layer发出的（到driver）requests数（outgoing requests）。进等于出，所以：
 
-$$ Writes Queued + Writes Requeued - Write Dispatches = Write Merges $$
+- $$ Writes Queued + Writes Requeued = Write Dispatches + Write Merges $$
 
 $Write Dispatches$是block layer发送到driver的requests数，但不是所有发送到driver的都完成了，其中有一部分被requeue了，即：
 
-$$ Write Dispatches = Writes Completed + Writes Requeued $$
+- $$ Write Dispatches = Writes Completed + Writes Requeued $$
 
 **例1**：把/dev/sde(设备号:8,64)整个盘格式化成ext4，挂载到/mnt并使用fio写/mnt/fio-test-file (rw=randwrite ioengine=psync bs=4k fsync=1)，同时trace /dev/sde
 
@@ -259,9 +259,8 @@ Skips: 0 forward (0 -   0.0%)
 
 Summary部分的Total(sde)：
 
-$$ Incomming Requests = Writes Queued + Writes Requeued = 8763 $$
-$$ Outgoing Requests = Write Dispatches = 5380 $$
-$$ Write Merges = Incomming Requests - Outgoing Requests = 8763 - 5380 = 3383 $$
+- $$ Incomming Requests = Writes Queued + Writes Requeued = 8763 + 0 = 8763 $$
+- $$ Outgoing Requests = Write Dispatches + Write Merges = 5380 + 3383 = 8763 $$
 
 另外，可以看到各个read指标都为0，因为fio全是写操作且大小和文件系统block对齐。可以对比还是全写操作但bs=5k(不再和文件系统block对齐)的情形，这时候read指标就不为0了，因为不对齐，文件系统需要把部分修改的block读出来，修改然后再写回去。
 
@@ -304,16 +303,14 @@ Total (sde):
   8,64   0     1176    21.238455782     0  C  WS 3927579616 + 8 [0]
 ```
 
-看起始位置为3927579616的request，和例1中的request相比，这个request多了一个`A`事件，因为这个IO是从/dev/sde2(设备号:8,66)remap到/dev/sde(设备号:8,64)的。总耗时21.238455782-21.225404128 = 13051654纳秒 - 13毫秒。
+看起始位置为3927579616的request，和例1中的request相比，这个request多了一个`A`事件，因为这个IO是从/dev/sde2(设备号:8,66)remap到/dev/sde(设备号:8,64)的。总耗时21.238455782-21.225404128 = 13051654纳秒 = 13.05毫秒。
 
 **例3**：基于例2的数据，我们找一个merge的请求:
 
 ```
 # blkparse -i sde | grep -w M
   ......
-  8,64  13     4417    59.166019679 96519  M  WS 5857801416 + 8 [jbd2/sde2-8]
   8,64  13     4434    59.194332313 96519  M  WS 5857801440 + 8 [jbd2/sde2-8]
-  8,64  13     4451    59.232388528 96519  M  WS 5857801464 + 8 [jbd2/sde2-8]
   ......
 
 # blkparse -i sde | grep -w 5857801440
@@ -322,7 +319,7 @@ Total (sde):
   8,64  13     4434    59.194332313 96519  M  WS 5857801440 + 8 [jbd2/sde2-8]
 ```
 
-这个请求从remap到queued，然后merge到一个已存在的请求中，之后便追踪不到了：因为它是其他某个请求的一部分，而不是一个独立的请求。假如知道它被merge到哪个请求了，去追踪那个请求，就能知道后续各个阶段。另外注意，被合并的情况下，没有get request (G)阶段，而直接被合并了（参考第2节结尾的IO流程图）。
+这个请求从remap到queued，然后再merge到一个已存在的请求中，之后便追踪不到了：因为它是其他某个请求的一部分，而不是一个独立的请求。假如知道它被merge到哪个请求了，去追踪那个请求，就能知道后续各个阶段。另外注意，被合并的情况下，没有get request (G)阶段，而直接被合并了（参考第2节结尾的IO流程图）。
 
 通过这三个例子我们可以看出，blktrace可以追踪到一个特定request的各个阶段，及各个阶段的耗时。但这太详细了，我们无法逐一查看各个request。这时`btt`命令就派上用场了，它可以生成报表。blkparse还有一个功能：把blktrace生成的`{device}.blktrace.{cpu}`一堆文件dump成一个二进制文件，输出到`-d`指定的文件中（忽略标准输出）。这个功能正好方便`btt`的使用。
 
