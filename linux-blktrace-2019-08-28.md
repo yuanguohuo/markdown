@@ -342,7 +342,7 @@ sde.blktrace.bin
 
 ## 阶段定义 (5.1)
 
-我们把第2节的流程图简化成下图，用来表示各阶段的时延：
+我们再用一个图来表示各阶段的时延：
 
 <div align=center>![阶段图](blktrace-stags.jpg)
 
@@ -359,7 +359,7 @@ sde.blktrace.bin
 
 注意以下几点：
 - Q2Q是表示两个reqeusts之间的间隔；而其他都是表示一个request的各个阶段的间隔。
-- 上面绿色部分表示一个典型request（没有被merge的request）特有的阶段；下面红色表示一个被merge的request特有的阶段；黄色部分表示公共阶段。
+- 和第2节中的IO的流程图一致，分为两个路径：上面绿色`Q->G->I->D`表示一个典型request（没有被merge的request）特有的阶段；下面红色为`Q->M->D`表示一个被merge的request特有的阶段；黄色部分表示公共阶段。
 - Q2G一般比较小，若它比较大，说明分配不到`struct request`，中途经历了S(sleep)阶段。
 
 ## btt的默认输出 (5.2)
