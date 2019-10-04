@@ -72,19 +72,21 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 * S: sleep. 系统没有可用的`struct request`实例，所以需要等待别的实例被释放。
 
-其次，`S-G->I`这一过程可能被merge取代，也就是说，请求不是作为一个独立的`struct request`进入IO scheduler（device的queue），而是合并到IO scheduler中的某个`struct request`中；在这种情况下，不用分配`struct request`实例。
+其次，`G->I`之间可能有plug/unplug阶段。为了把小请求合成大请求以提高效率，linux在`struct task_struct`上维护一个plug队列。在plug状态（即堵住队列出口）下，该进程的发起请求进入这个队列，以期望在此得到合并（和device的队列一样）。在unplug的时候，再把这个队列中的请求（可能是合并后的大请求）移到IO scheduler（device的queue）。因为plug队列是per-process的，所以请求入队时不需要锁。也就是说，plug/unplug机制是在per-process的队列上，进行一个merge尝试；因为无需加锁，效率更高。
+
+* P: plug. plug开始。1. 进程进入plug状态后，第一个请求到来时；2. 当前plug队列长度已达到最大，flush它，然后开始新的plug时；
+* U: unplug. flush plug队列。
+
+一个细节：这两个事件并不是per-request的，而是进程开始plug和结束plug的事件。所以，它们对于分析request的延迟等并不重要。
+
+其次，`S-G->P->U->I`这一过程可能被merge取代，也就是说，请求不是作为一个独立的`struct request`进入IO scheduler（device的queue），而是合并到IO scheduler中的某个`struct request`中；在这种情况下，不用分配`struct request`实例。
 
 * M: back merge. 当前请求被合并到IO scheduler（device的queue）中的某个请求之后。
 * F: front merge. 当前请求被合并到IO scheduler（device的queue）中的某个请求之前。
 
-另外，一个请求还可能经历plug和unplug阶段。在I(inserted)之后，D(issued)之前，即在IO scheduler（device的queue）中，若一个request到来的时候，device的queue为空，linux会plug这个队列(即堵住队列的出口)一段时间，期待有更多的request进来(这样可以合并？)。当队列中有一定数量的requests之后，或者等待超时，linux就会unplug这个队列(打开队列出口，request开始从IO scheduler出去，进入driver)。
-
-* P: plug. request进来的时候，device的队列为空，plug直到一定数量的request进来，或超时。
-* U: unplug. 一定数量的request进来，或超时，unplug队列。
-
 下图粗略显示一个IO的流程。左边是比较详细，其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。所以，右边是典型的IO流程。
 
-<div align=center>![IO流程](io-flow-merge.jpg)
+<div align=center>![IO流程](io-flow.jpg)
 
 # 使用blktrace导出原始数据 (3)
 
