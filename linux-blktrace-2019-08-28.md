@@ -84,9 +84,16 @@ IO发起之后，主要会经历以下阶段(事件)：
 * M: back merge. 当前请求被合并到IO scheduler（device的queue）中的某个请求之后。
 * F: front merge. 当前请求被合并到IO scheduler（device的queue）中的某个请求之前。
 
-下图粗略显示一个IO的流程。左边是比较详细，其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。所以，右边是典型的IO流程。
+下图粗略显示一个IO的流程：
 
 <div align=center>![IO流程](io-flow.jpg)
+
+左边比较详细，其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。按照进入IO scheduler（device的queue）方式，可以分成两个路径：
+
+- Q->G->I->D: 请求作为独立的request进入IO scheduler（device的queue）。这里忽略一些细节，比如请求可能没有经历`G->I`而是合并到plug队列；因为plug/unplug事件不是per-request的，我们不考虑plug/unplug细节，而把这个路径简化为：分配`struct request`，然后insert到IO scheduler（device的queue）。
+- Q->M->D：请求直接合并到一个已经存在于IO scheduler（device的queue）的request中。
+
+右边是一个简化流程，也是典型流程：没有合并，没有可选阶段，是我们工作中最常见的情况。
 
 # 使用blktrace导出原始数据 (3)
 
@@ -335,7 +342,7 @@ sde.blktrace.bin
 
 ## 阶段定义 (5.1)
 
-我们再用一个图表示各个阶段的时延：
+我们把第2节的流程图简化成下图，用来表示各阶段的时延：
 
 <div align=center>![阶段图](blktrace-stags.jpg)
 
