@@ -72,7 +72,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 * S: sleep. 系统没有可用的`struct request`实例，所以需要等待别的实例被释放。
 
-其次，`G->I`之间可能有plug/unplug阶段。为了把小请求合成大请求以提高效率，linux在`struct task_struct`上维护一个plug队列。在plug状态（即堵住队列出口）下，该进程的发起请求进入这个队列，以期望在此得到合并（和device的队列一样）。在unplug的时候，再把这个队列中的请求（可能是合并后的大请求）移到IO scheduler（device的queue）。因为plug队列是per-process的，所以请求入队时不需要锁。也就是说，plug/unplug机制是在per-process的队列上，进行一个merge尝试；因为无需加锁，效率更高。
+其次，`G->I`之间可能有plug/unplug阶段。为了把小请求合成大请求以提高效率，linux在`struct task_struct`上维护一个plug队列。在plug状态（即堵住队列出口）下，该进程的发起请求进入这个队列，以期望在此得到合并（和device的队列一样）。在unplug的时候，再把这个队列中的请求（可能是合并后的大请求）移到IO scheduler（device的queue）。因为plug队列是per-process的，所以请求入队时不需要锁。也就是说，plug/unplug机制是在per-process的队列上，进行一个merge尝试；因为无需加锁，效率更高。具体见[block layer的plug和unplug](http://www.yuanguohuo.com/2019/10/04/linux-block-layer-plug-unplug/)。
 
 * P: plug. plug开始。1. 进程进入plug状态后，第一个请求到来时；2. 当前plug队列长度已达到最大，flush它，然后开始新的plug时；
 * U: unplug. flush plug队列。
