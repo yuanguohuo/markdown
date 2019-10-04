@@ -1,7 +1,7 @@
 ---
 title: linux iostat详解
 date: 2019-08-17 08:40:28
-tags: [linux,iostat]
+tags: [kernel,io,iostat]
 categories: linux 
 ---
 

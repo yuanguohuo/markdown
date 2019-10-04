@@ -1,7 +1,7 @@
 ---
 title: Linux blktrace
 date: 2019-08-28 20:48:12
-tags: [linux,blktrace]
+tags: [io,blktrace]
 categories: linux 
 ---
 

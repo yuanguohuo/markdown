@@ -1,7 +1,7 @@
 ---
 title: 使用block_dump观察block io 
 date: 2019-06-28 18:31:32
-tags: [linux,block]
+tags: [kernel,io,block]
 categories: linux 
 ---
 

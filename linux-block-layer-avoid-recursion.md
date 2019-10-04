@@ -1,7 +1,7 @@
 ---
-title: block设备stack中的递归避免 
+title: 避免block device stack中的递归
 date: 2019-10-04 13:17:11
-tags: [linux,block]
+tags: [kernel,io,block]
 categories: linux 
 ---
 
