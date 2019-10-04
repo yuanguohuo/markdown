@@ -213,3 +213,6 @@ root       2750      2  0 20:34 ?        00:00:00 [bioset]
 即内核有一些bioset线程，一个线程对应一个mempool。当一个mempool已满而不能再分配bio对象的时候，之前从这个mempool中分配出来的bio对象（现在在`current->bio_list`中）就转交给这个mempool对应的bioset线程来处理。这就打破了死锁：bioset线程处理完bio，bio对象就能归还到mempool中。
 
 这种方式比较重，需要创建一些内核线程，而这些内核线程又很少被使用（死锁很少发生），所以，linux 4.11又作了一些优化（以上部分是基于linux 3.19.8的），不在本文的范围之内。
+
+参考：
+https://lwn.net/Articles/736534/
