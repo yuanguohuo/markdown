@@ -35,7 +35,7 @@ assert_eq!(v, vec!["panama", "a cancel", "a plan", "a man"]);
 
 # Reference and Slice (2)
 
-本来reference和slice没什么关系的，但是书里面有一个不精确的表达：slice是vector或者array的一个片段，记作`[T]`，但slice永远是按引用传递的，即没有`[T]`类型的变量，只有`&[T]`类型的变量。`&[T]`类型的变量本该叫做slice reference，但是因为不存在`[T]`的变量，所以，`&[T]`常常被简单地叫做slice。为了精确，本文中把`&[T]`叫做**slice reference**。所以，我们要看的是reference和slice reference的区别。
+Slice是vector或者array的一个片段，记作`[T]`，但slice永远是按引用传递的，换言之，不存在slice类型（`[T]`）的变量，只存在slice reference类型（`&[T]`）的变量。因为前者不存在，所以书中常常把`&[T]`简单地叫做slice类型。为了精确起见，本文还是把`&[T]`叫做**slice reference类型**。我们要看的是reference和slice reference的区别。
 
 |类型               |指向的内容         |Owning         |值                    |
 |-------------------|-------------------|---------------|----------------------|
@@ -157,3 +157,17 @@ String可以理解为Vec<u8>，唯一要求是u8序列必须可以解析为UTF-8
 ## Rc and Arc (4.3)
 
 ## Borrow reference (4.4)
+
+### 类型的lifetime (4.4.1)
+
+Rust中的所有类型都有lifetime：
+
+- `i32`：lifetime是`'static`。这并不是说所有i32变量的lifetime都是`'static`；而是说，一个i32类型的变量，其lifetime**受限于**`'static`。
+- `Vec<i32>`：同`i32`。
+- `Vec<&'a i32>`：lifetime是`'a`。这并不是说所有本类型的变量的lifetime都是某个`'a`；而是说，一个本类型的变量，其lifetime**受限于**一个`'a`，并且对于不同的变量，其`'a`也是不同的。
+- `struct S<'a> {x: &'a i32}`:：同`Vec<&'a i32>`。
+- `struct S<'a, 'b> {x: &'a i32, y: &'b i32}`：lifetime是`min{'a, 'b}`。一个本类型的变量，其lifetime同时**受限于**`'a`和`'b`，并且对于不同的变量，其`'a`和`'b`也是不同的。
+
+这里的**受限于**是**小于等于**或者**被包含（enclosed by）**的意思。
+
+
