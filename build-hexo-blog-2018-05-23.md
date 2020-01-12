@@ -35,9 +35,9 @@ $ npm install hexo --save
 
 # 初始化 (3)
 ```shell
-$ mkdir hexo-root
+$ hexo init hexo-root
 $ cd hexo-root
-$ hexo init .
+$ npm install
 ```
 这里创建了一个空目录hex-root，并进行hexo初始化。**后续的操作都在hexo-root目录下执行**。
 
