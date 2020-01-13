@@ -11,7 +11,8 @@ categories: java
 
 # Throwable (1)
 
-![Throwable](throwable.jpg)
+{% asset_img throwable.jpg Throwable %}
+
 
 # Error和Exception (2)
 

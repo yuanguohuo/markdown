@@ -25,7 +25,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 
 逻辑上是这样没有问题，然而实现上是有讲究的。实现实现是层层调用，形成一个`generic_make_request`的递归：
 
-<div align=center>![layered-block-device](layered-block-device.jpg)
+{% asset_img layered-block-device.jpg layered-block-device %}
 
 这样的实现比较直观，但当虚拟block层数过多时，内核调用栈就会很深。栈太深一方面会导致性能降低，另一方面可能导致栈溢出。当bio是文件系统提交的话，这个问题就更严重，因为文件系统本身就消耗了相当深的栈。Linux 2.6.22以前就存在这个问题。
 

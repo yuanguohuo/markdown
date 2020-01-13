@@ -44,7 +44,9 @@ NETLINK_NETFILTER协议对应的是netfilter，netfilter包含3个功能：
 - 其中一种协议是NETLINK_NETFILTER，与之对应的是netfilter；
 - netfilter包含3个功能，每个功能都包含内核模块和用户态库两部分；
 
-用一张图表示它们之间的关系：![模块关系图](relationship.jpg)
+用一张图表示它们之间的关系：
+
+{% asset_img relationship.jpg module %}
 
 # netfilter queue (2)
 

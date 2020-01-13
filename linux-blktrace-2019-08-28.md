@@ -86,7 +86,7 @@ IO发起之后，主要会经历以下阶段(事件)：
 
 下图粗略显示一个IO的流程：
 
-<div align=center>![IO流程](io-flow.jpg)
+{% asset_img io-flow.jpg io-flow-chart %}
 
 左边比较详细，其中灰色的阶段（事件）可能经历也可能不经历（多数情况不经历）；而红色和绿色阶段（事件）是多种可能，且最可能是绿色。按照进入IO scheduler（device的queue）方式，可以分成两个路径：
 
@@ -155,7 +155,8 @@ blkparse的输出包含两个部分：1. IO事件；2. summary
 
 * **IO事件**
 
-<div align=center>![IO事件](blkparse-output-1.png)
+{% asset_img blkparse-output-1.png io events %}
+
 
 * 第1列：`8,0`是设备号，major和minor；
 * 第2列：`3`是cpuid；
@@ -173,7 +174,7 @@ blkparse的输出包含两个部分：1. IO事件；2. summary
 
 Summary包括CPU和device两个维度:
 
-<div align=center>![summary](blkparse-output-2.png)
+{% asset_img blkparse-output-2.png blkparse output %}
 
 其中对于每个CPU或者对于Total：
 - Writes Queued：trace时间内，Q(queue)的requests个数；
@@ -344,7 +345,7 @@ sde.blktrace.bin
 
 我们再用一个图来表示各阶段的时延：
 
-<div align=center>![阶段图](blktrace-stags.jpg)
+{% asset_img blktrace-stags.jpg stage chart %}
 
 其中各个阶段的定义如下：
 

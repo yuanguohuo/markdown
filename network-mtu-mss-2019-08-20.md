@@ -25,16 +25,16 @@ MTU(maximum transmission unit)，即最大传输单元，是指一种通信协�
 
 分片会带来一些开销。所以，有的时候应该避免。TCP在建连的时候会协商一个MSS (maximum segment size)，这个MSS是TCP payload的最大长度。因为IP头是20字节，TCP头也是20字节，所以通常MSS是1500-20-20=1460字节。
 
-![TCP MSS](tcp-mss.png)
+{% asset_img tcp-mss.png %}
 
 
 TCP header的options字段只在SYN=1的时候出现。MSS是其中的一个option，它向对方声明：我可以接受的最大TCP segment是x(例如1460)。并且两个方向上的MSS是独立的。
 
-![MSS 选项](mss-option.png)
+{% asset_img mss-option.png %}
 
 对于GRE tunnel，假如MSS还为1460，那么最终IP报文的长度将大于1500。如下图所示：
 
-![GRE MSS](gre-mss.png)
+{% asset_img gre-mss.png %}
 
 由于GRE header的长度是24字节，TCP的MSS应该是1460-24=1436。由于终端设备不是总能知道高层协议增加了报文的长度，就像这里的GRE，所以不会自动调整MSS的值。因此，网络设备提供覆盖MSS的选项，例如Cisco的路由器有一个`ip tcp mss-adjust 1436`命令，它会覆盖所以SYN的TCP报文的MSS选项。这样一来，通过该路由器建立的TCP连接的MSS就是1436了。
 
@@ -42,7 +42,7 @@ TCP header的options字段只在SYN=1的时候出现。MSS是其中的一个opti
 
 首先看一个从服务器上抓到的包
 
-![TSO On](tso-on.png)
+{% asset_img tso-on.png %}
 
 建连过程中协商的MSS是1460，但是发的包却慢慢增大，最后到了5840（大于1460）。这是为什么呢？答案是TSO (TCP Segmentation Offload；也叫做LSO: Large Segment Offload)。TSO是一种利用网卡的少量处理能力，降低CPU发送数据包负载的技术。它把分片逻辑从CPU下放到(offload)网络接口卡(NIC)，以减少CPU的负载。当然，这需要NIC硬件及驱动的支持。
 
@@ -87,4 +87,4 @@ generic-segmentation-offload: off [requested on]
 
 上面关闭了TSO，再抓包，发现每个TCP payload都是1460了：
 
-![TSO Off](tso-off.png)
+{% asset_img tso-off.png %}

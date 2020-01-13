@@ -38,7 +38,7 @@ Linux 2.6.39之前也有plug机制，但它是在device的queue上进行的，�
 
 下图简单的表示了这个过程，其中`mq_list`用于multi-queue（blk-mq），`cb_list`用于md，暂时忽略。
 
-<div align=center>![plug-unplug](plug-unplug.jpg)
+{% asset_img plug-unplug.jpg plug and unplug %}
 
 在`task_struct`中维护这个list有一个好处：进程在调用`blk_start_plug()`和`blk_finish_plug()`之间若发生block，即调用`schedule()`，可以在block住之前**方便地**找到pending的请求（就在`task_struct`的list中），并flush它们。在进程block之前flush掉pending的请求非常重要：
 
