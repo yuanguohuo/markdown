@@ -51,7 +51,7 @@ $$ \frac{4096}{15+4096+100} = 97.3\% $$
 |total                  |577B          |4211B          |
 |efficiency             |88.7%         |97.3%          |
 
-<div align=center>![Advanced Format](advfmt.jpg)
+{% asset_img advfmt.jpg Advanced Format %}
 
 总结来说：引入4K扇区有两个好处：
 
@@ -71,18 +71,18 @@ $$ \frac{4096}{15+4096+100} = 97.3\% $$
 
 简写为4Kn，这类磁盘firmware里不会把4K的物理扇区模拟成512B的逻辑扇区，也就是说，外部可见的逻辑扇区直接映射到内部的物理扇区。自从2014年开始，企业级的4K native磁盘已经在市场上流通了。这类磁盘的logo如下：
 
-<div align=center>![4Knative](4knative.jpg)
+{% asset_img 4knative.jpg 4Knative %}
 
 但，由于4Kn不能兼容512B扇区的软硬件系统，它的使用并不广泛。虽然Windows(Windows8和Windows Server 2012)和Linux(自从kernel 2.6.31)都支持4Kn的磁盘，然而很多操作系统不能从4Kn磁盘引导([见这里](https://askubuntu.com/questions/337693/how-to-format-a-4k-sector-hard-drive)和[这里](https://lwn.net/Articles/377895/))，这些磁盘通常作为外部存储使用。
 ## 512e (3.2)
 
 为了向下兼容，磁盘提供商在firmware里模拟512B扇区，目前这也是事实上的标准([见这里](http://idema.org/?page_id=2900))。这类磁盘被叫做Advanced Format 512e, 或者512 emulation磁盘。它的logo如下：
 
-<div align=center>![512e](512e.jpg)
+{% asset_img 512e.jpg 512e %}
 
 4096B扇区和512B扇区之间的转换是磁盘的firmware完成的，对外界透明，也就是说，可以像读写传统磁盘一样来读写512e磁盘，如下图所示：
 
-<div align=center>![512e-read-write](512e-rw.jpg)
+{% asset_img 512e-rw.jpg 512e-read-write %}
 
 比如，操作系统读取512B数据，磁盘驱动器会：
 
@@ -111,7 +111,7 @@ Linux系统已经作了优化：
 
 注意第二点，**这要求分区和物理扇区是对齐的**。假如分区和物理扇区没有对齐，而每个写操作和分区又是对齐的，导致的结果是，每个写操作恰恰和物理扇区没有对齐。如下图所示：
 
-<div align=center>![512e-alignment](512e-align.jpg)
+{% asset_img 512e-align.jpg 512e-alignment %}
 
 可见，系统IO-1和系统IO-2和分区是对齐的。但是，分区和物理扇区没有对齐，导致磁盘IO-1和磁盘IO-2都没对齐，并且每个磁盘IO需要两次RMW，共4个RMW才能完成。所以，**分区和物理扇区的对齐至关重要**。parted可以检查已有分区是否对齐；并且在做新分区时，若没对齐，也会得到警告。下面我们做一个测试。
 
