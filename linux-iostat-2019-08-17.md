@@ -24,10 +24,10 @@ struct disk_stats {
 };
 ```
 
-* `sectors[2]`    : read扇区的数量和write扇区的数量；
-* `ios[2]`        : read请求数和write请求数；
-* `merges[2]`     : read请求的合并次数和write请求的合并次数；
-* `ticks[2]`      : read请求从初始化到完成消耗的jiffies累计，和write请求从初始化到完成消耗的jiffies累计；
+* `sectors[2]`    : read/write扇区的数量；
+* `ios[2]`        : read/write请求数；
+* `merges[2]`     : read/write请求的合并次数；
+* `ticks[2]`      : read/write请求从初始化到完成消耗的jiffies累计；
 * `io_ticks`      : 该分区上存在请求(不管是read还是write)的jiffies累计；
 * `time_in_queue` : 该分区上存在的请求数量(不管是read还是write)与逝去jiffies的加权累计；
 
