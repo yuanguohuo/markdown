@@ -149,7 +149,7 @@ matched: [8 8 hello hello]
 Foo: [8 8 hello hello]
 ```
 
-# match对象是值但pattern是ref (4)
+# match对象是值但pattern是ref (5)
 
 ```rs
 fn match_val_by_ref() {
