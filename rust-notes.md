@@ -1,5 +1,5 @@
 ---
-title: rust语法笔记 
+title: Rust语法笔记 
 date: 2019-07-28 18:34:21
 tags: [rust]
 categories: rust 

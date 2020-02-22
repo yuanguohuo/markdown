@@ -1,5 +1,5 @@
 ---
-title: rust的pattern match 
+title: Rust的pattern match 
 date: 2020-01-13 23:53:30
 tags: [rust]
 categories: rust 
