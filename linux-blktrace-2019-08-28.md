@@ -29,14 +29,14 @@ blktrace是block层的trace机制，它可以跟踪IO请求的生成、进入队
 
 所以广义的blktrace包含这3个部分，狭义的blktrace只是blktrace命令。本文介绍广义的blktrace：包括使用blktrace命令导出IO信息，然后使用blkparse和btt分析展示。blktrace命令通过 debug file system 从内核导出数据：
 
-- blktrace从kernel接收数据并通过debug file system的buffer传递到用户态；debug file system默认是/sys/kernel/debug，可以使用blktrace命令的`-r`选项来覆盖。buffer的大小和数量默认是512KiB和4，可以通过`-b`和`-n`来覆盖。blktrace运行的的时候，可以看见debug file system里有一个block/{device}(默认是/sys/kernel/debug/block/{device})目录被创建出来，里面有一些trace{cpu}文件。
+- blktrace从kernel接收数据并通过debug file system的buffer传递到用户态；debug file system默认是/sys/kernel/debug，可以使用blktrace命令的`-r`选项来覆盖。buffer的大小和数量默认分别是512KiB和4，可以通过`-b`和`-n`来覆盖。blktrace运行的的时候，可以看见debug file system里有一个block/{device}(默认是/sys/kernel/debug/block/{device})目录被创建出来，里面有一些trace{cpu}文件。
 - blktrace默认地搜集所有trace到的事件，可以使用blktrace命令的`-a`选项来指定事件。
 - blktrace把从内核接收到的数据写到当前目录，文件名为`{device}.blktrace.{cpu}`，内容是二进制数据（对于人来说是不可读的；blkparse用于解析这些二进制数据）。例如`blktrace -d /dev/sdc`会生成sdc.blktrace.0, sdc.blktrace.1, ... sdc.blktrace.N-1个文件，N为cpu个数。也可使用`-o`选项来自定义`{device}`部分，这方便和blkparse结合使用：blktrace的`-o`参数对应blkparse的`-i`参数。
 - blktrace默认地会一直运行，直到被`ctrl-C`停掉。可以使用`-w`选项来指定运行时间，单位是秒。
 
 blktrace会区分两类请求:
 
-* 文件系统请求(fs requests)：通常是用户态进程产生的，读写disk的特定位置和特定大小的数据。当然，也有可能由内核产生：flust脏页或sync文件系统的元数据(super block或journal block等)。
+* 文件系统请求(fs requests)：通常是用户态进程产生的，读写disk的特定位置和特定大小的数据。当然，也有可能由内核产生：flush脏页或sync文件系统的元数据(super block或journal block等)。
 * SCSI命令(pc requests)：blktrace直接把SCSI命令发送到用户态，blkparse可以解析它。
 
 简单情况下，可以**实时解析**：一边导出IO事件，一边解析。
@@ -62,11 +62,11 @@ blkparse -i sde
 
 IO发起之后，主要会经历以下阶段(事件)：
 
-* Q: queued. request尚未生成，只是queue到指定的位置(不清楚)。
-* G: get request. 分配一个`struct request`实例，生成request。
-* I: inserted. request被发送到IO scheduler（device的queue）。
-* D: issued. IO scheduler（device的queue）中的请求被发送到driver。
-* C: complete. 发送到driver中的请求已经完成了。这个事件会描述IO的初始sector和size(位置和大小)，以及是成功还是失败。
+* `Q`: queued. request尚未生成，只是queue到指定的位置(不清楚)。
+* `G`: get request. 分配一个`struct request`实例，生成request。
+* `I`: inserted. request被发送到IO scheduler（device的queue）。
+* `D`: issued. IO scheduler（device的queue）中的请求被发送到driver。
+* `C`: complete. 发送到driver中的请求已经完成了。这个事件会描述IO的初始sector和size(位置和大小)，以及是成功还是失败。
 
 首先，`Q->G`之间可能有一个S(sleep)阶段：
 
@@ -184,7 +184,7 @@ Summary包括CPU和device两个维度:
 - Writes Completed：trace时间内，完成的requests数；
 - Timer unplugs：超时导致的unplug数？
 
-$Writes Queued$与$Writes Requeued$之和是trace时间内block layer接收的requests总数（incomming requests）。$Write Dispatches$和$Write Merges之和是trace时间内block layer发出的（到driver）requests数（outgoing requests）。进等于出，所以：
+$Writes Queued$与$Writes Requeued$之和是trace时间内block layer接收的requests总数（incomming requests）。$Write Dispatches$和$Write Merges$之和是trace时间内block layer发出的（到driver）requests数（outgoing requests）。进等于出，所以：
 
 $$ Writes Queued + Writes Requeued = Write Dispatches + Write Merges $$
 
@@ -573,3 +573,86 @@ $$ Ratio = \frac{N_Q}{N_D} $$
 # Q bucket for > 1024
 1024 0
 ```
+
+# 案例分析
+
+这是一个实际案例:
+
+* 15台server的存储集群；
+* 读写请求size都全是4MB；
+* 读写比为1:99；
+* 数据重要性不高但要求吞吐最大化，所以没有DIRECT_IO也没有sync；
+
+所以，磁盘非常忙，一阵阵的util达到100%。这是正常情况。但是:
+
+* 有一部分read请求非常慢，达到几百毫秒到几秒;
+* 经调查发现，这些慢的请求绝大多数都落在其中1台server上；
+* 用`iostat -mx 1`发现这台server的磁盘`r_await`偶尔达到几百毫秒甚至一两秒；
+
+由于一时无法找到它和别的机器的差异，我决定用blktrace跟踪一下。结果如下：
+
+**那台异常server**
+
+```
+==================== All Devices ====================
+
+            ALL           MIN           AVG           MAX           N
+--------------- ------------- ------------- ------------- -----------
+
+Q2Q               0.000001995   0.010033461  10.023989208        9815
+Q2G               0.000000347   0.003843207   0.696858530        9552
+S2G               0.048137359   0.145633808   0.696857847         252
+G2I               0.000000142   0.328743363   2.776173431       33946
+Q2M               0.000000208   0.000000812   0.000002409         264
+I2D               0.000000132   0.137160059   2.776167198       33946
+M2D               0.000001866   0.539617620   1.967329760         914
+D2C               0.000216501   0.130975084   3.220956219        9806
+Q2C               0.000246199   0.623738004   3.722805145        9806
+
+==================== Device Overhead ====================
+
+       DEV |       Q2G       G2I       Q2M       I2D       D2C
+---------- | --------- --------- --------- --------- ---------
+ (  8,160) |   0.6002% 182.4532%   0.0000%  76.1241%  20.9984%
+---------- | --------- --------- --------- --------- ---------
+   Overall |   0.6002% 182.4532%   0.0000%  76.1241%  20.9984%
+```
+
+**其他正常server**
+
+```
+==================== All Devices ====================
+
+            ALL           MIN           AVG           MAX           N
+--------------- ------------- ------------- ------------- -----------
+
+Q2Q               0.000001890   0.010906159  10.023224943        8643
+Q2G               0.000000312   0.003979822   0.372903417        8401
+S2G               0.053733843   0.149889471   0.372902366         223
+G2I               0.000000108   0.000001933   0.000275039        8401
+Q2M               0.000000193   0.000000814   0.000003222         243
+I2D               0.000001472   0.506893154   1.107299400        8401
+M2D               0.000006108   0.524695447   1.021934348         243
+D2C               0.000188799   0.120154070   1.465156680        8644
+Q2C               0.000205362   0.631417524   2.251692980        8644
+
+==================== Device Overhead ====================
+
+       DEV |       Q2G       G2I       Q2M       I2D       D2C
+---------- | --------- --------- --------- --------- ---------
+ (  8,160) |   0.6126%   0.0003%   0.0000%  78.0218%  19.0293%
+---------- | --------- --------- --------- --------- ---------
+   Overall |   0.6126%   0.0003%   0.0000%  78.0218%  19.0293%
+```
+
+其主要区别在于`G2I`和`I2D`两项：
+
+```
+异常server:    G2I               0.000000142   0.328743363   2.776173431       33946
+正常server:    G2I               0.000000108   0.000001933   0.000275039        8401
+
+异常server:    I2D               0.000000132   0.137160059   2.776167198       33946
+正常server:    I2D               0.000001472   0.506893154   1.107299400        8401
+```
+
+异常机器`G2I`高但`I2D`低，正常server则相反；这很是调度算法的不同导致的。一查果然，异常server是`deadline`而正常server是`cfq`。修正之后，症状消失。
