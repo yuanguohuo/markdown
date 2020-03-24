@@ -38,11 +38,11 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 
 结果是：
 
-$$ avgrq-sz = min{bs, read_ahead_kb, max_sectors_kb} $$
+$$ AvgRqSz = min(bs,ReadAheadKB,MaxSectorsKB) $$
 
 一些文档说`POSIX_FADV_RANDOM`用于禁止read ahead。可是，要是read ahead被禁止的话，请求应该是page-by-page的（见linux 3.19.8 `mm/filemap.c:do_generic_file_read()`），也就是`avgrq-sz=4KiB`（通常page size是4KiB），而实际上并不是如此，这是为什么呢？
 
-找到[patch-187024](https://lore.kernel.org/patchwork/patch/187024/)才发现，在过去的版本中的确是page-by-page的，这很低效，现在已经不是这样了：
+找到[patch-187024](https://lore.kernel.org/patchwork/patch/187024/)才发现，在过去的版本中的确是page-by-page的，因为这很低效，现在已经修改了：
 
 ```
 This fixes inefficient page-by-page reads on POSIX_FADV_RANDOM.
