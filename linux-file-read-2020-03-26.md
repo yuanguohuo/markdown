@@ -82,7 +82,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 首先是初始化一些变量：
 
 * `struct address_space *mapping = filp->f_mapping;`：`mapping`里面的`page_tree`就是pagache；
-* `struct inode *inode = mapping->host;`： `mapping`的owner inode。1. 对于普通文件来说，就是`filp->f_dentry->d_inode`；2. 对于block device file来说，就是bdev special filesystem里面的inode；`filp`就是/dev/sdc这样的文件，所属文件系统是devtmpfs；这个文件只是bdev special filesystem里面的文件的"指针"；bdev special filesystem没有mount，所以不可见。"指针"是这样实现的：devtmpfs文件系统中的inode有两个字段：`i_bdev`和`i_rdev`；其中`i_bdev`是一个指向`struct block_device`的指针，而`struct block_device`嵌套在`struct bdev_inode`之内（可以通过`struct block_device`的地址得到外面`struct bdev_inode`的地址）。`struct bdev_inode`是什么呢？它就是bdev special filesystem内的inode。所以说，可以认为devtmpfs文件系统中的inode的`i_bdev`指向bdev special filesystem内的inode。当这个`i_bdev`为NULL的时候，就用到`i_rdev`，它是主设备号和从设备号，可以通过它去打开`struct block_device`，然后把返回的地址存入`i_bdev`。见`blkdev_open()`函数。所以说，**devtmpfs文件系统中的文件是bdev special filesystem里面的文件的"指针"或"快捷方式"**。扯远了，和本文无关。
+* `struct inode *inode = mapping->host;`： `mapping`的owner inode。1. 对于普通文件来说，就是`filp->f_dentry->d_inode`；2. 对于block device file来说，就是bdev special filesystem里面的inode；`filp`就是/dev/sdc这样的文件，所属文件系统是devtmpfs；这个文件只是bdev special filesystem里面的文件的"指针"；bdev special filesystem没有mount，所以不可见。"指针"是这样实现的：devtmpfs文件系统中的inode有两个字段：`i_bdev`和`i_rdev`；其中`i_bdev`是一个指向`struct block_device`的指针，而`struct block_device`嵌套在`struct bdev_inode`之内（可以通过`struct block_device`的地址得到外面`struct bdev_inode`的地址）。`struct bdev_inode`是什么呢？它就是bdev special filesystem内的inode。所以说，可以认为devtmpfs文件系统中的inode的`i_bdev`指向bdev special filesystem内的inode。当这个`i_bdev`为NULL的时候，就用到`i_rdev`，它是主设备号和从设备号，可以通过它去打开`struct block_device`，然后把返回的地址存入`i_bdev`。见`blkdev_open()`函数。所以说，**devtmpfs文件系统中的文件是bdev special filesystem里面的文件的"指针"或"快捷方式"**。这里拿到的`inode`就是bdev special filesystem里的inode，它是pagacache的owner，也是服务读请求的主体。
 * `index`：把文件看做是一个连续的page（通常是4KiB）数组，`index`就是read请求的第1字节所在的page号，也就是这个page在pagecache中的位置；
 * `last_index`：read请求的最后1字节所在page的后面一个page的号（注意不是最后1字节所在的那个page的号），也就是那个page在pagecache中的位置。这样形成一个前闭后开的区间`[index, last_index)`；
 * `offset`：read请求的第1字节在它所在的page内的偏移。虽然内核是按page从底层读数据的，但返回给用户必须精确到字节，`offset`就是用来标记从第1个page的哪个位置开始往iter（指向用户态buffer）拷贝数据。当read请求区间跨page时，对于后续的page，`offset`被更新为0，表示从page的开头开始拷贝。
@@ -98,5 +98,3 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 - 在`readpage`处，调用`mapping->a_ops->readpage`；它是一个文件系统相关的函数指针，对于ext4来说，指向`ext4_readpage`。`ext4_readpage`再调用`mpage_readpage`，构造一个bio，发到block层。返回之后，goto page_ok；
 - 在`page_ok`处，把page的数据拷贝到`iter（用户态buffer）`
 - continue进行下一轮循环；
-
-
