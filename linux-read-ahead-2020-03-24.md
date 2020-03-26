@@ -58,7 +58,7 @@ performance: a 16K read will be carried out in 4 _sync_ 1-page reads.
 - some IO error happened
 ```
 
-现在`POSIX_FADV_RANDOM`的语义不是禁止read ahead，而是禁止基因算法：
+现在`POSIX_FADV_RANDOM`的语义不再是禁止read ahead，而是禁止基因算法，从而如实地把应用程序的read IO发下去：
 
 ```
 POSIX_FADV_RANDOM actually want a different semantics: to disable the
@@ -68,7 +68,7 @@ submit read IO for whatever application requests.
 So introduce a flag FMODE_RANDOM for POSIX_FADV_RANDOM.
 ```
 
-直接使用请求大小(`bs`)，当然，也受限于`read_ahead_kb`和`max_sectors_kb`（三者中取最小）。 
+也就是直接发送应用程序的请求大小(`bs`)，当然，也受限于`read_ahead_kb`和`max_sectors_kb`（三者中取最小）。 
 
 看这个patch的diff:
 
