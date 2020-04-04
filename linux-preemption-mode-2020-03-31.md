@@ -522,7 +522,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 * Configuring and using Hi resolution timers;
 * some more minor features;
 
-如果创建一个priority大于50的线程，就会block中断处理。这种模式下，系统将做更多的调度所以浪费更多的CPU，但可以保证毫秒级（1ms）的deadline。
+如果创建一个priority大于50的线程，就会block中断处理。这种模式下，系统将做更多的调度所以浪费更多的CPU，但可以满足毫秒级（1ms）的deadline。
 
 # 参考 (6)
 
