@@ -381,7 +381,7 @@ T2 stop at 1585968050. elapse: 13 seconds. buf=[19:"is a demothis is a "]
 
 可见和"No Forced Preemption"行为一致，T1睡眠了13秒（T2在用户态睡眠1秒在内核态占用CPU 12秒）。现在修改一下内核态的代码，增加一个"explicit preemption point"（`might_sleep()`）：
 
-```
+```c
 static ssize_t device_read(struct file *flip, char __user *buffer, size_t len, loff_t *offset) {
   int bytes_read = 0;
   mdelay(6000);
@@ -422,7 +422,7 @@ T2 stop at 1585968366. elapse: 13 seconds. buf=[19:"this is a demothis "]
 
 如何保证这个共识呢？比如我写个函数里面会sleep，我可能在注释中写上"this function may sleep"，但这也不能保证别人不在临界区里调用它啊。函数`might_sleep()`就是用来解决这个问题的：它会检查当前上下文是不是在临界区里，假如在临界区，就会panic。假如我写一个会sleep的函数，我就在函数开头调用一下`might_sleep()`，别人在临界区调用我的函数，也就panic了。当然这是在debug（`CONFIG_DEBUG_ATOMIC_SLEEP`被定义）模式下的行为；假如`CONFIG_DEBUG_ATOMIC_SLEEP`没被定义，`might_sleep()`的作用就相当于一个annotation。所以，现在的内核代码中，可能sleep的函数，大都有对`might_sleep()`的调用。
 
-```
+```c
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
 # define might_sleep() \
 	do { __might_sleep(__FILE__, __LINE__, 0); } while (0)
@@ -491,7 +491,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 
 回到"Voluntary Kernel Preemption"，由于`might_sleep()`已经广泛存在于内核代码中，且是允许sleep的地方，所以，正好可以在这些地方植入"explicit preemption point"。这个patch就是这么做的：
 
-```
+```c
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
 # define might_sleep() \
 	do { __might_sleep(__FILE__, __LINE__, 0); might_resched(); } while (0)
@@ -502,7 +502,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 
 可见，无论`CONFIG_DEBUG_ATOMIC_SLEEP`是否定义，`might_sleep()`都会调用`might_resched()`，这个函数定义是：
 
-```
+```c
 #ifdef CONFIG_PREEMPT_VOLUNTARY
 # define might_resched() _cond_resched()
 #else

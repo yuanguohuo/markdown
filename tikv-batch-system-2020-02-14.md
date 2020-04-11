@@ -80,10 +80,24 @@ struct Poller<N: Fsm, C: Fsm, Handler> {
 }
 ```
 
-其中`fsm_receiver`就是`channel`的接收端。`Poller`的工作就是从`fsm_receiver`中接收`Fsm`（这些`Fsm`上有`Message`），然后处理它们，处理的逻辑是业务层的事，所以这里由一个`trait`表示，即`PollHandler`。从`fsm_receiver`接收到的可能是`Control Fsm`也可能是`Normal Fsm`，所以`PollHandler`定义了对应的`handle_control`和`handle_normal`接口。
+其中`fsm_receiver`就是`channel`的接收端。一个`Poller`就是一个线程，线程中运行`Poller::poll()`函数。这个函数是一个大循环，每一轮都是从`fsm_receiver`中接收一批`Fsm`（可能是`Control Fsm`也可能是`Normal Fsm`，这些`Fsm`上有`Message`），由结构体`Batch`表示，然后处理它们。BatcySystem的名字就来源于此：一次接收并处理一批`Fsm`。详细点说：
 
-另外，`Poller`从`fsm_receiver`中一下接收一批`Fsm`，由结构体`Batch`表示。
+* 上面有$M$个`Fsm/BasicMailbox`（在Tikv中，一个region对应一个`Normal Fsm/BasicMailbox`，此外还有一个`Control Fsm/BasicMailbox`）；
+* 下面有$N$个`Poller`，构成线程池；
+* 当一个`Fsm`（无论`Normal Fsm`还是`Control Fsm`）的`BasicMailbox`接收到`Message`的时候，这个`Fsm`就被`Scheduler`发给线程池去处理；
+* 每个线程（`Poller::pool()`）一次拿一批`Fsm`来处理，处理完之后再还给`BasicMailbox`（等`BasicMailbox`再接收到`Message`的时候，再处理）；
+
+注意，这里面有两个消息通道：
+
+- 1. `Fsm`被发往`Poller`的消息通道：发送端在`Scheduler`里，接收端在`Poller`里； 
+- 2. `Message`被发往`Fsm`的消息通道：发送端在`BasicMailbox`里，接收端在`Fsm`里；
+
+如上所述，`Poller::poll()`的主要工作是从`fsm_receiver`中接收一批`Fsm`并处理它们。但，处理的逻辑是业务层的事，所以这里由一个trait（`PollHandler`）表示处理逻辑。由于`fsm_receiver`接收到既有`Control Fsm`也有`Normal Fsm`，所以`PollHandler`定义了`handle_control`和`handle_normal`接口。可以想象，业务成实现`PollHandler`的时候，应该是从`Fsm`接收`Message`，处理它，驱动`Fsm`。
 
 # `BatchSystem` (5)
 
-`BatchSystem`就是把上述东西组合起来，其`spawn`函数的工作就是创建一批`Poller`实例，并为它们一一放进线程里运行起来。
+`BatchSystem`就是把上述东西组合起来，其`spawn`函数的工作就是创建$N$个`Poller`实例，并启动线程。
+
+# 小结 (6)
+
+本文梳理一下BatchSystem的逻辑，后文就不用再陷入这些细节，聚焦于Tikv的业务逻辑：一个消息发给一个`PeerFsm`或`StoreFsm`的时候，直接去看对应的`PollHandler`实现即可。
