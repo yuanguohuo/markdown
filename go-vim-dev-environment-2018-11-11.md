@@ -30,22 +30,25 @@ vim-filesystem-7.4.160-4.el7.x86_64
 
 ## 安装vim8.1 (1.2)
 
-vim依赖ncurses需要事先安装。另外由于后面的YouCompleteMe依赖python，所以这里编译vim8.1的时候要加上python支持。先安装python-devel，否则，虽然configure不会报错，但其实python并没有被支持。这里只支持了python2，本来应该可以同时支持python3，但是没搞成功(vim的文档里提到Ubuntu16.04里同时支持python2和python3会有bug，但是我的环境是CentOS7，暂不深究)。
+vim依赖ncurses需要事先安装。另外由于后面的YouCompleteMe依赖python，所以这里编译vim8.1的时候要加上python和python3支持。先安装python-devel和python3-devel。
 
 ```
 # yum install -y ncurses.x86_64  ncurses-devel.x86_64
-# yum install -y python-devel.x86_64
+# yum install -y python-devel.x86_64 python3-devel.x86_64
 
 # tar xjvf vim-8.1.tar.bz2
 # cd vim81/  
-# ./configure --with-features=huge                                 \
-              --enable-multibyte                                   \
-              --enable-rubyinterp=yes                              \
-              --enable-pythoninterp=yes                            \
-              --with-python-config-dir=/usr/lib64/python2.7/config \
-              --enable-luainterp=yes                               \
-              --enable-cscope                                      \
-              --prefix=/usr/local/vim8.1
+
+# ./configure                                                                            \
+            --enable-fail-if-missing                                                     \
+            --with-features=huge                                                         \
+            --enable-multibyte                                                           \
+            --enable-pythoninterp=yes                                                    \
+            --with-python-config-dir=/usr/lib64/python2.7/config                         \
+            --enable-python3interp=yes                                                   \
+            --with-python3-config-dir=/usr/lib64/python3.6/config-3.6m-x86_64-linux-gnu  \
+            --enable-cscope                                                              \
+            --prefix=/usr/local/vim8.1
 
 # make
 # make install
@@ -53,14 +56,16 @@ vim依赖ncurses需要事先安装。另外由于后面的YouCompleteMe依赖pyt
 
 需要说明的是:
 * `--enable-multibyte`是为了打开多字节支持，否则在Vim中不能输入中文。
+* `--enable-fail-if-missing`使得configure发现缺失依赖，就立即失败，而不是继续运行。
 * 如此安装之后，vim8.1的runtime dir就是/usr/local/vim8.1/share/vim/vim81。
+
 
 把vim的路径加入PATH，然后确认一下python被支持：
 
 ```
 # vim --version | grep python
-+comments          +libcall           +python            +vreplace
-+conceal           +linebreak         -python3           +wildignore
++cmdline_info      +libcall           +python/dyn        +visual
++comments          +linebreak         +python3/dyn       +visualextra
 ```
 
 # 安装go (2)
