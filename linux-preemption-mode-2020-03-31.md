@@ -512,9 +512,9 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 
 当抢占模式是"Voluntary Kernel Preemption"的时候（`CONFIG_PREEMPT_VOLUNTARY`被定义），`might_resched`被定义为`_cond_resched()`；否则定义为空。
 
-# Real Time 内核
+# Real Time 内核 (5)
 
-前面所说的一切，都是基于RR调度（见前文用户态代码`pthread_attr_setschedpolicy(&attr, SCHED_RR)`）或FIFO调度（把`SCHED_RR`改成`SCHED_FIFO`）；`SCHED_OTHER`, `SCHED_IDLE`, `SCHED_BATCH`没有priority。除了这些调度模式之外，linux还有一个RT patch（Real Time），对应内核配置项是`CONFIG_PREEMPT_RT`。如果使用这种模式，所有的代码都可能block别的代码（高优先级一定block低优先级），即使是中断处理程序（ISR）也能够被block。这个patch做了如下修改：
+除了前述的3中抢占模式外，linux还有一个RT patch（Real Time），对应内核配置项是`CONFIG_PREEMPT_RT`。如果使用这种模式，所有的代码都可能block别的代码（高优先级一定block低优先级），即使是中断处理程序（ISR）也能够被block。这个patch做了如下修改：
 
 * Converting hardware Interrupts to threads with RT priority 50;
 * Converting SoftIRQs to threads with RT 49 priority;
@@ -523,6 +523,20 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 * some more minor features;
 
 如果创建一个priority大于50的线程，就会block中断处理。这种模式下，系统将做更多的调度所以浪费更多的CPU，但可以满足毫秒级（1ms）的deadline。
+
+# 抢占模式和调度策略 (6)
+
+值得一提的是，前文例子中使用的`SCHED_RR`（以及`SCHED_FIFO`）都属于实时调度策略（real-time policy）；然而real-time policy与第5节所讲的Real Time内核并没有关系，不要混淆（虽然它们都有real time的字眼），也不要以为real-time policy（`SCHED_RR`和`SCHED_FIFO`）只有在Real Time内核下才工作：
+
+- 调度策略：它指定了进程/线程的优先级，谁能抢占谁。
+- 抢占模式：在内核态的抢占时机。
+
+首先，根据调度策略确定是否应该进行任务切换：
+
+- 若为real-time policy，则有更高优先级的任务变得runable，就应该切换；
+- 若不是real-time policy, 则根据nice值以及各任务对CPU的占用时间计算出动态优先级，决定是否应该切换。假如需要任务切换，
+
+然后，进行进行任务切换，若被抢占的的任务正处在内核态，才要涉及到内核抢占模式。前文例子中是使用real-time policy `SCHED_RR`是因为real-time policy下，可以指定静态的priority（而不是通过nice值计算的动态priority），并且优先级高的一定要抢占优先级低的，如果优先级低的处于内核态，就会涉及到抢占模式。这正好方便我们演示抢占模式的效果。
 
 # 参考 (6)
 
