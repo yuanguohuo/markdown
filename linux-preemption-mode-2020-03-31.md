@@ -255,6 +255,7 @@ int main()
 	struct sched_param param;
 	  
 	pthread_attr_init(&attr);
+	pthread_attr_setinheritsched (&attr, PTHREAD_EXPLICIT_SCHED);
 	pthread_attr_setschedpolicy(&attr, SCHED_RR);
 	
 	param.sched_priority = 50;
@@ -538,7 +539,7 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
 
 然后，进行进行任务切换，若被抢占的的任务正处在内核态，才要涉及到内核抢占模式。前文例子中是使用real-time policy `SCHED_RR`是因为real-time policy下，可以指定静态的priority（而不是通过nice值计算的动态priority），并且优先级高的一定要抢占优先级低的，如果优先级低的处于内核态，就会涉及到抢占模式。这正好方便我们演示抢占模式的效果。
 
-# 参考 (6)
+# 参考 (7)
 
 https://github.com/torvalds/linux/blob/master/kernel/Kconfig.preempt
 https://kernelnewbies.org/FAQ/Preemption
