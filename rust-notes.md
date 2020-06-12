@@ -11,7 +11,7 @@ categories: rust
 
 # Array and Vector (1)
 
-Array的语法是`[T; length]`，length必须是常量(编译时能够确定其值)。这和C/C++的静态数组(即`T a[length];`定义的数组，而不是`T *a = new T[length];`定义的数组)很相似。问题：array能在heap上么？
+Array的语法是`[T; length]`，length必须是常量(编译时能够确定其值)。这和C/C++的静态数组(即`T a[length];`定义的数组，而不是`T *a = new T[length];`定义的数组)很相似。问题：array能在heap上么？答：不能，array只能在栈上，就像C/C++的局部静态数组一样。
 
 Vector的数据一定在heap上。可以使用以下3中方式创建vector:
 - `Vec::new()`: 创建一个空的vector；
@@ -160,16 +160,5 @@ String可以理解为Vec<u8>，唯一要求是u8序列必须可以解析为UTF-8
 
 ### 类型的lifetime (4.4.1)
 
-Rust中的所有类型都有lifetime：
-
-- `i32`：lifetime是`'static`。这并不是说所有i32变量的lifetime都是`'static`；而是说，一个i32类型的变量，其lifetime**受限于**`'static`。
-- `Vec<i32>`：同`i32`。
-- `Vec<&'a i32>`：lifetime是`'a`。这并不是说所有本类型的变量的lifetime都是某个`'a`；而是说，一个本类型的变量，其lifetime**受限于**一个`'a`，并且对于不同的变量，其`'a`也是不同的。
-- `struct S<'a> {x: &'a i32}`:：同`Vec<&'a i32>`。
-- `struct S<'a, 'b> {x: &'a i32, y: &'b i32}`：lifetime是`min{'a, 'b}`。一个本类型的变量，其lifetime同时**受限于**`'a`和`'b`，并且对于不同的变量，其`'a`和`'b`也是不同的。
-
-这里的**受限于**是**小于等于**或者**被包含（enclosed by）**的意思。
-
 ### 变量的lifetime (4.4.2)
-
 
