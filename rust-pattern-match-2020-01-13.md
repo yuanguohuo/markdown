@@ -9,7 +9,7 @@ Rust中match随处可见，但是其中有一些细节值得注意：被match的
 
 <!-- more --> 
 
-# 测试类 (1)
+# 测试类
 
 ```rs
 struct Foo<'a, 'b> {
@@ -29,7 +29,7 @@ impl<'a, 'b> Foo<'a, 'b> {
 }
 ```
 
-# match对象和pattern都是值 (2)
+# match对象和pattern都是值 (1)
 
 ```rs
 fn match_val_by_val() {
@@ -64,7 +64,7 @@ Foo: [1 1 a a]
 matched: [1 2 a b]
 ```
 
-# match对象和pattern都是ref (3)
+# match对象和pattern都是ref (2)
 
 ```rs
 fn match_ref_by_ref() {
@@ -114,7 +114,7 @@ Foo: [8 8 hello hello]
 matched: [8 8 hello hello]
 ```
 
-# match对象是ref但pattern是值 (4)
+# match对象是ref但pattern是值 (3)
 
 ```rs
 fn match_ref_by_val() {
@@ -149,7 +149,7 @@ matched: [8 8 hello hello]
 Foo: [8 8 hello hello]
 ```
 
-# match对象是值但pattern是ref (5)
+# match对象是值但pattern是ref (4)
 
 ```rs
 fn match_val_by_ref() {
