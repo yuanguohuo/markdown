@@ -63,7 +63,7 @@ impl<'a, 'b> fmt::Display for Foo<'a, 'b> {
                 sref,
             } => {
                 //ival(type i32)         : copied from f.ival;
-                //iref(type &mut i32)    : moved from f.iref;
+                //iref(type &mut i32)    : moved from f.iref; 注意: &mut和Option(&mut)不是Copy类型；&和Option(&)是Copy类型；
                 //sval(type String)      : moved from f.sval;
                 //sref(type &mut String) : moved from f.sref;
 
@@ -101,7 +101,7 @@ matched: [1 2 a b]
         match r {
             &Foo {ival, iref, sval, sref} => {
                 //ival: copied from r.ival;
-                //iref: would be moved from r.iref; but r is a reference, move is not allowed;
+                //iref: would be moved from r.iref; but r is a mut reference, move is not allowed; 注意: &mut和Option(&mut)不是Copy类型；&和Option(&)是Copy类型；
                 //sval: would be moved from r.sval; not allowed;
                 //sref: would be moved from r.sref; not allowed;
 
