@@ -41,6 +41,22 @@ impl<'a, 'b> fmt::Display for Foo<'a, 'b> {
         )
     }
 }
+
+pub struct Bar<T> {
+    pub val: T,
+}
+
+impl<T> Bar<T> {
+    pub fn new(val: T) -> Self {
+        Bar { val }
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Bar<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Bar:[val: {}]", self.val)
+    }
+}
 ```
 
 # match对象和pattern都是值 (1)
@@ -73,6 +89,18 @@ impl<'a, 'b> fmt::Display for Foo<'a, 'b> {
             }
         }
         //println!("{}", f); //this would not compile, because f was moved;
+
+        let b = Bar::new(i);
+        match b {
+            Bar { val } => println!("matched Bar({})", val),
+        }
+        println!("{}", b);
+
+        let b1 = Bar::new(String::from("hello"));
+        match b1 {
+            Bar { val } => println!("matched Bar({})", val),
+        }
+        //println!("{}", b1); //value borrowed here after partial move
     }
 ```
 
@@ -82,7 +110,21 @@ impl<'a, 'b> fmt::Display for Foo<'a, 'b> {
 --------match_val_by_val--------
 Foo:[ival(i32): 1, iref(&mut i32): 1, sval(String): a, sref(&mut String): a]
 matched: [1 2 a b]
+matched Bar(2)
+Bar:[val: 2]
+matched Bar(hello)
+ok
 ```
+
+这种match，相当于每个member move（或copy），但整体object没有被move（或copy），也就是说：
+
+- `match obj`的时候，obj没有被move（或copy）；不要认为是在pattern那里构造一个新对象，obj被move（或copy）到那里；
+- `obj`里的每个成员被move（或copy）；
+
+所以：
+
+- 若`obj`里的每个成员都是Copy类型，那么`match obj`之后，`obj`是没有被move的，例如`b`；
+- 若`obj`里存在不是Copy类型的成员，那么`match obj`之后，`obj`就被`partial move`了（partial是指那些不是Copy类型的成员）例如`f`和`b1`；可以通过`ref`关键字来变成引用而不是move；
 
 # match对象和pattern都是ref (2)
 
@@ -104,12 +146,6 @@ matched: [1 2 a b]
                 //iref: would be moved from r.iref; but r is a mut reference, move is not allowed; 注意: &mut和Option(&mut)不是Copy类型；&和Option(&)是Copy类型；
                 //sval: would be moved from r.sval; not allowed;
                 //sref: would be moved from r.sref; not allowed;
-
-                //this would be fine if all members of Foo are Copy. It can be thought this way:
-                //rust would create a brand new Foo from r, as a result, all members would be
-                //moved (unless it is Copy) from r; but on the other hand r is a reference
-                //which cannot be moved. So, this will not compile if any member of r is not Copy;
-
                 println!("matched: [{} {} {} {}]", ival, *iref, sval, *sref);
             }
         }
@@ -132,6 +168,13 @@ matched: [1 2 a b]
         }
         println!("{}", f);
         println!("{}", r);
+
+        let b = Bar::new(i);
+        let rb = &b;
+        match rb {
+            &Bar { val } => println!("matched Bar({})", val),
+        }
+        println!("{}", b);
     }
 ```
 
@@ -143,7 +186,15 @@ Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): he
 matched: [8 8 hello hello]
 Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): hello]
 Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): hello]
+matched Bar(8)
+Bar:[val: 8]
+ok
 ```
+
+和`match_val_by_val`一致，只是不会发生`partial move`而是会编译失败（因为引用不能被move）：
+
+- 若`obj`里的每个成员都是Copy类型，那么`match &obj`之后，`obj`是没有被move的（显而易见，我们match的是引用，都没有ownership），例如`b`；
+- 若`obj`里存在不是Copy类型的成员，那么`match &obj`会编译失败，例如注释掉的个`match`语句；可以通过`ref`关键字来变成引用而不是move；
 
 # match对象是ref但pattern是值 (3)
 
@@ -184,7 +235,13 @@ Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): he
 Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): hello]
 matched: [8 8 hello hello]
 Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): hello]
+ok
 ```
+
+这种最简单：
+
+- `match &obj`不可能使obj被move（显而易见，我们match的是引用，都没有ownership）；
+- pattern中的每个字段都是`obj`中对应字段的引用；
 
 # match对象是值但pattern是ref (4)
 
@@ -214,23 +271,21 @@ Foo:[ival(i32): 8, iref(&mut i32): 8, sval(String): hello, sref(&mut String): he
 
 ```
 error[E0308]: mismatched types
-   --> src/test_match/test_struct_match.rs:149:13
+   --> src/test_match/test_struct_match.rs:179:13
     |
-147 |           match f {
+177 |           match f {
     |                 - this expression has type `test_match::test_struct_match::Foo<'_, '_>`
-148 |               //error here: expected struct `Foo`, found reference
-149 | /             &Foo {
-150 | |                 ival,
-151 | |                 iref,
-152 | |                 sval,
-153 | |                 sref,
-154 | |             } => {} //not allowed
+178 |               //error here: expected struct `Foo`, found reference
+179 | /             &Foo {
+180 | |                 ival,
+181 | |                 iref,
+182 | |                 sval,
+183 | |                 sref,
+184 | |             } => {} //not allowed
     | |_____________^ expected struct `test_match::test_struct_match::Foo`, found reference
     |
     = note: expected struct `test_match::test_struct_match::Foo<'_, '_>`
             found reference `&_`
 
 error: aborting due to previous error
-
-For more information about this error, try `rustc --explain E0308`.
 ```
