@@ -105,9 +105,10 @@ matched: [1 2 a b]
                 //sval: would be moved from r.sval; not allowed;
                 //sref: would be moved from r.sref; not allowed;
 
-                //this would be fine if all members of Foo are copiable. It can be thought this way:
-                //rust tries to create a brand new Foo object from *r, this would fail if any memeber
-                //of *r is not copiable;
+                //this would be fine if all members of Foo are Copy. It can be thought this way:
+                //rust would create a brand new Foo from r, as a result, all members would be
+                //moved (unless it is Copy) from r; but on the other hand r is a reference
+                //which cannot be moved. So, this will not compile if any member of r is not Copy;
 
                 println!("matched: [{} {} {} {}]", ival, *iref, sval, *sref);
             }
