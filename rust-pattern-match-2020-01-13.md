@@ -19,7 +19,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
   src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
 </script>
 
-# 测试类
+** 测试类 **
 
 ```rs
 use std::fmt;
