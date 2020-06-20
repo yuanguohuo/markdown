@@ -9,6 +9,16 @@ Rust中match随处可见，但是其中有一些细节值得注意：被match的
 
 <!-- more --> 
 
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+});
+</script>
+
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
 # 测试类
 
 ```rs
@@ -116,15 +126,15 @@ matched Bar(hello)
 ok
 ```
 
-这种match，相当于每个member move（或copy），但整体object没有被move（或copy），也就是说：
+这种match，相当于每个成员被复制（move或copy），但整体object没有被复制（move或copy），也就是说，`match obj`的时候：
 
-- `match obj`的时候，obj没有被move（或copy）；不要认为是在pattern那里构造一个新对象，obj被move（或copy）到那里；
-- `obj`里的每个成员被move（或copy）；
+- `obj`不会被复制（move或copy）；
+- `obj`里的每个成员被复制（move或copy）；
 
-所以：
+之前我一直认为是在pattern那里构造一个新对象，`obj`被复制（move或copy）到那里。这是不对的。看上面例子中的`b`：假如像我之前认为的那样，`b`在`match`的时候就被复制（就是move，因为`Bar`不是Copy），之后打印它就会编译失败。所以，强调一下：`match obj`的时候，`obj`这个对象本身（作为一个整体）没有被复制（move或copy）：
 
-- 若`obj`里的每个成员都是Copy类型，那么`match obj`之后，`obj`是没有被move的，例如`b`；
-- 若`obj`里存在不是Copy类型的成员，那么`match obj`之后，`obj`就被`partial move`了（partial是指那些不是Copy类型的成员）例如`f`和`b1`；可以通过`ref`关键字来变成引用而不是move；
+- 若`obj`里的每个成员都是Copy类型，那么`match obj`之后，`obj`是完好无损的（`obj`本身没被move或copy，成员被copy了而已），例如`b`；
+- 若`obj`里存在非Copy类型的成员，那么`match obj`之后，`obj`就被`partial move`了（partial就是指那些不是Copy类型的成员）例如`f`和`b1`。可以使用`ref`关键字来引用非Copy成员，而避免复制（move）；
 
 # match对象和pattern都是ref (2)
 
@@ -193,8 +203,8 @@ ok
 
 和`match_val_by_val`一致，只是不会发生`partial move`而是会编译失败（因为引用不能被move）：
 
-- 若`obj`里的每个成员都是Copy类型，那么`match &obj`之后，`obj`是没有被move的（显而易见，我们match的是引用，都没有ownership），例如`b`；
-- 若`obj`里存在不是Copy类型的成员，那么`match &obj`会编译失败，例如注释掉的个`match`语句；可以通过`ref`关键字来变成引用而不是move；
+- 若`obj`里的每个成员都是Copy类型，那么`match &obj`之后，`obj`是完好无损的（`obj`本身没被move或copy——显而易见，我们match的是引用，都没有ownership谈何move——成员被copy了而已），例如`b`；
+- 若`obj`里存在非Copy类型的成员，那么`match &obj`会编译失败（需要move，但我们match的是引用，没有ownership），例如注释掉的个`match`语句。可以使用`ref`关键字来引用非Copy成员，而避免复制（move）；
 
 # match对象是ref但pattern是值 (3)
 
@@ -240,7 +250,7 @@ ok
 
 这种最简单：
 
-- `match &obj`不可能使obj被move（显而易见，我们match的是引用，都没有ownership）；
+- `match &obj`不可能使obj被move（显而易见，我们match的是引用，没有ownership）；
 - pattern中的每个字段都是`obj`中对应字段的引用；
 
 # match对象是值但pattern是ref (4)
@@ -289,3 +299,9 @@ error[E0308]: mismatched types
 
 error: aborting due to previous error
 ```
+
+# 小结 (5)
+
+对于<u>(1)match对象和pattern都是值</u>和<u>(2)match对象和pattern都是ref</u>这两种情况来说：Rust**试图**对obj的成员一一复制（move或copy），**仅此而已，不复制obj这个变量本身**。对于<u>(1)</u>可能导致对象被`partial move`；对于<u>(2)</u>可能导致编译错误。两者都是由obj中存在非Copy成员，对它们的复制（即move）导致的。且两者都可以使用`ref`关键字来引用非Copy成员，而避免复制（move）它们。
+所以，<u>(3)match对象是ref但pattern是值</u>有点像是一个优化：所有成员，无论是不是Copy，都不复制（move或copy），一律引用。
+个人理解是，*(2)*应该少用，根据程序的上下文：若match以后永远不再需要访问obj就使用<u>(1)</u>；否则，还需要保留obj就使用<u>(3)</u>。
