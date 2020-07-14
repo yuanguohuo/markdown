@@ -1,11 +1,11 @@
 ---
-title: Tikv的BatchSystem
+title: TiKV的BatchSystem
 date: 2020-02-14 08:57:12
 tags: [tikv, BatchSystem]
 categories: tikv 
 ---
 
-BatchSystem是Tikv实现multi-raft的基石，本文介绍BatchSystem的实现。BatchSystem本身是一个抽象出来的通用的模块，不牵涉业务逻辑（multi-raft），方便单独介绍。
+BatchSystem是TiKV实现multi-raft的基石，本文介绍BatchSystem的实现。BatchSystem本身是一个抽象出来的通用的模块，不牵涉业务逻辑（multi-raft），方便单独介绍。
 
 <!-- more -->
 
@@ -27,7 +27,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 
 `Fsm`是一个trait，由业务逻辑来实现。`Fsm`的运转是靠`Message`来驱动的，所以就有了`BasicMailbox`。一个`Fsm`和一个`BasicMailbox`绑定：`BasicMailbox`用于接收驱动`Fsm`的`Message`；`Fsm`是发到`BasicMailbox`的`Message`的owner。
 
-```
+```rust
 pub struct BasicMailbox<Owner: Fsm> {
     sender: mpsc::LooseBoundedSender<Owner::Message>,
     state: Arc<FsmState<Owner>>,
@@ -38,7 +38,7 @@ pub struct BasicMailbox<Owner: Fsm> {
 
 当需要驱动`Fsm`的时候，就通过以下两个函数向关联的`BasicMailbox`发一个`Message`：
 
-```
+```rust
 impl<Owner: Fsm> BasicMailbox<Owner> {
     pub fn force_send<S: FsmScheduler<Fsm = Owner>>(
         &self,
@@ -71,7 +71,7 @@ impl<Owner: Fsm> BasicMailbox<Owner> {
 
 前文说过，每个`Scheduler`有一个`channel`，有`Message`发给一个`Fsm`（发送到其关联的`BasicMailbox`）的时候，`Fsm`就被放进`channel`。`Poller`就是这个`channel`的消费者：
 
-```
+```rust
 struct Poller<N: Fsm, C: Fsm, Handler> {
     router: Router<N, C, NormalScheduler<N, C>, ControlScheduler<N, C>>,
     fsm_receiver: channel::Receiver<FsmTypes<N, C>>,
@@ -82,7 +82,7 @@ struct Poller<N: Fsm, C: Fsm, Handler> {
 
 其中`fsm_receiver`就是`channel`的接收端。一个`Poller`就是一个线程，线程中运行`Poller::poll()`函数。这个函数是一个大循环，每一轮都是从`fsm_receiver`中接收一批`Fsm`（可能是`Control Fsm`也可能是`Normal Fsm`，这些`Fsm`上有`Message`），由结构体`Batch`表示，然后处理它们。BatcySystem的名字就来源于此：一次接收并处理一批`Fsm`。详细点说：
 
-* 上面router里有$M$个`Fsm/BasicMailbox`（在Tikv中，一个region对应一个`Normal Fsm/BasicMailbox`，此外还有一个`Control Fsm/BasicMailbox`）；
+* 上面router里有$M$个`Fsm/BasicMailbox`（在TiKV中，一个region对应一个`Normal Fsm/BasicMailbox`，此外还有一个`Control Fsm/BasicMailbox`）；
 * 下面线程池里有$N$个`Poller`；
 * 当一个`Fsm`（无论`Normal Fsm`还是`Control Fsm`）的`BasicMailbox`接收到`Message`的时候，这个`Fsm`就被`Scheduler`发给线程池去处理；
 * 每个线程（`Poller::pool()`）一次拿一批`Fsm`来处理，处理完之后再还给`BasicMailbox`（等`BasicMailbox`再接收到`Message`的时候，再处理）；
@@ -118,4 +118,4 @@ pub trait PollHandler<N, C> {
 
 # 小结 (6)
 
-本文梳理一下BatchSystem的逻辑，后文就不用再陷入这些细节，聚焦于Tikv的业务逻辑：一个消息发给一个`PeerFsm`或`StoreFsm`的时候，直接去看对应的`PollHandler`实现即可。
+本文梳理一下BatchSystem的逻辑，后文就不用再陷入这些细节，聚焦于TiKV的业务逻辑：一个消息发给一个`PeerFsm`或`StoreFsm`的时候，直接去看对应的`PollHandler`实现即可。
