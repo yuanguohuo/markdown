@@ -73,7 +73,7 @@ void blk_start_plug(struct blk_plug *plug)
 }
 ```
 
-`blk_start_plug()`非常简单，把一个`struct blk_plug`对象安装到`struct task_struct`中。另外从代码上看，plug还可以嵌套的：
+`blk_start_plug()`非常简单，把一个`struct blk_plug`对象安装到`struct task_struct`中。另外从代码上看，plug还可以嵌套的（注意只有最底层的`plug`才会安装到`struct task_struct`）：
 
 - 调用`blk_start_plug(plug1)`
 - 提交请求req1，req1被pending在plug1上；
@@ -85,7 +85,7 @@ void blk_start_plug(struct blk_plug *plug)
 
 ## pending请求 (2.2)
 
-```
+```c
 generic_make_request(bio)
     make_request_fn  (以blk_queue_bio为例)
         blk_queue_bio
@@ -152,7 +152,7 @@ asmlinkage __visible void __sched schedule(void)
 
 可见，flush是由`blk_flush_plug_list()`函数完成的，其中第2个参数表明flush是不是schedule触发的，若是，则以异步的方式处理pending的请求。
 
-```
+```c
 void blk_flush_plug_list(struct blk_plug *plug, bool from_schedule)
 {
     struct request_queue *q;
