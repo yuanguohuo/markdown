@@ -36,7 +36,7 @@ Linux 2.6.39之前也有plug机制，但它是在device的queue上进行的，�
 - 多次调用`generic_make_request()`提交这一批请求；请求在list中reorder与merge；
 - 调用`blk_finish_plug()`把list中的合并得到的大请求flush到device的queue；调用`schedule()`也会触发这样的flush；
 
-下图简单的表示了这个过程，其中`mq_list`用于multi-queue（blk-mq），`cb_list`用于md，暂时忽略。
+下图简单的表示了这个过程，其中`mq_list`用于multi-queue（blk-mq），`cb_list`用于md，暂时忽略，只看`list`。
 
 {% asset_img plug-unplug.jpg plug and unplug %}
 
