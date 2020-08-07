@@ -1,7 +1,7 @@
 ---
 title: LevelDB的table结构
 date: 2020-08-07 17:45:20
-tags: [leveldb, lru, cache]
+tags: [leveldb, block, table]
 categories: leveldb
 ---
 
@@ -29,7 +29,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 - 这些kv-pair之后，即从`data_ + restart_offset_`开始，是一个`uint32_t`数组；每个`uint32_t`元素表示一个restart的偏移（相对于基地址`data_`）；所以前面有多少restart，这个数组里就有多少元素；
 - 最后是一个`uint32_t`，表示有多少个restart，即前面数组中有多少元素，叫做`NumRestarts`；
 
-{% block-format.jpg Block Format %}
+{% asset_img block-format.jpg Block Format %}
 
 解析一个Block的时候，从Block的末尾开始，解析出`NumRestarts`；再往前跳过`NumRestarts`个`uint32_t`，就得到数组开始的地方`data_ + restart_offset_`；然后就知道一个个restart的偏移了。
 
@@ -51,7 +51,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 - non-shared key数据；
 - value数据；
 
-{% kv-pair-format.jpg KV Format %}
+{% asset_img kv-pair-format.jpg KV Format %}
 
 如果知道前一个完整key，并且知道当前key的这些信息（shared长度，non-shared长度，non-shared数据），就可以构造出当前完整key。
 
@@ -60,7 +60,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 为了解决这个问题，就引入了restart：每个restart的第一个kv-pair的key是完整的，不和前一个restart的最后一个key共享任何前缀。这也是restart名字的由来：重新开始。所以，为了获得完整key，回溯到restart的第一个key即可：
 
 - 随机读：定位到被请求的restart，然后在本restart内从前到后搜索；
-- 反向迭代：restart从后到前，同一个restart内从前到后；可见，反向迭代`Prev()`还是明显比正向迭代代价高的；
+- 反向迭代：restart从后到前，同一restart内从前到后；例如：restart X有k1,k2,k3三个kv-pair，第一次迭代从k1找到k3返回k3，第二次从k1找到k2返回k2，第3次返回k1。若继续迭代，则以同样的方式在restart X-1内进行。可见，反向迭代的代价还是明显比正向高；
 
 只要restart别太大，代价还是可以接受的。默认一个restart包含16个kv-pair。
 
