@@ -1,11 +1,11 @@
 ---
-title: Leveldb中的LRUCache
+title: LevelDB的LRUCache
 date: 2019-07-19 19:00:32
 tags: [leveldb, lru, cache]
-categories: rocksdb
+categories: leveldb
 ---
 
-本文简要介绍一下Leveldb中LRUCache的实现。
+本文简要介绍一下LevelDB中LRUCache的实现。
 
 <!-- more -->
 
@@ -50,12 +50,12 @@ free(e);
 
 利用hash表(即`HandleTable`)实现的一个lru cache；这是一个单shard的lru cache。多shard的lru cache是`ShardedLRUCache`(见第4节)。注意，rocksdb中也有单shard lru cache和多shard lru cache，但它们的名字不一样：
 
-* leveldb的LRUCache = rocksdb的LRUCacheShard：单shard的lru cache；
-* leveldb的ShardedLRUCache = rocksdb的LRUCache：多shard的lru cache；
+* LevelDB的LRUCache = RocksDB的LRUCacheShard：单shard的lru cache；
+* LevelDB的ShardedLRUCache = RocksDB的LRUCache：多shard的lru cache；
 
 ## 内存对齐 (3.1)
 
-rocksdb的LRUCacheShard通过`alignas`关键字对齐到`CACHE_LINE_SIZE`，而leveldb的这个`LRUCache`并没有对齐；
+rocksdb的LRUCacheShard通过`alignas`关键字对齐到`CACHE_LINE_SIZE`，而LevelDB的这个`LRUCache`并没有对齐；
 
 ## LRU列表与LRUHandle的状态 (3.2)
 

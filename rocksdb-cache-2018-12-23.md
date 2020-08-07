@@ -2,7 +2,7 @@
 title: RocksDB中的LRUCache
 date: 2018-12-23 19:10:05
 tags: [rocksdb, lru, cache]
-categories: rocksdb
+categories: leveldb 
 ---
 
 本文简要介绍一下RocksDB中LRUCache的实现。
