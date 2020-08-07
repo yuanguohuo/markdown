@@ -9,6 +9,16 @@ LevelDB中table的结构。
 
 <!-- more -->
 
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+});
+</script>
+
+<script type="text/javascript" async
+  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
+</script>
+
 # Block (1)
 
 ## Block的结构 (1.1)
@@ -19,9 +29,7 @@ LevelDB中table的结构。
 - 这些kv-pair之后，即从`data_ + restart_offset_`开始，是一个`uint32_t`数组；每个`uint32_t`元素表示一个restart的偏移（相对于基地址`data_`）；所以前面有多少restart，这个数组里就有多少元素；
 - 最后是一个`uint32_t`，表示有多少个restart，即前面数组中有多少元素，叫做`NumRestarts`；
 
----------------------------------
-      图
----------------------------------
+{% block-format.jpg Block Format %}
 
 解析一个Block的时候，从Block的末尾开始，解析出`NumRestarts`；再往前跳过`NumRestarts`个`uint32_t`，就得到数组开始的地方`data_ + restart_offset_`；然后就知道一个个restart的偏移了。
 
@@ -43,22 +51,23 @@ LevelDB中table的结构。
 - non-shared key数据；
 - value数据；
 
----------------------------------
-      图
----------------------------------
+{% kv-pair-format.jpg KV Format %}
 
 如果知道前一个完整key，并且知道当前key的这些信息（shared长度，non-shared长度，non-shared数据），就可以构造出当前完整key。
 
 如此存储的好处是节省空间（包括磁盘空间和内存空间），但有一个明显的问题：随机读出一个kv-pair，它的key是不完整的（只包含non-shared部分）；要想构造出完整key，就需要前一个完整key，想要前一个完整key，又需要前一个的前一个完整key，以此类推，直到第一个key（没有任何shared）。这对于两种情况是无法忍受的：1.就是前述随机读；2.反向迭代。
 
-为了解决这个问题，就引入了restart：每个restart的第一个kv-pair的key是完整的，不和前一个restart的最后一个key共享任何前缀。所以，为了获得完整key，回溯到restart的第一个key即可：
+为了解决这个问题，就引入了restart：每个restart的第一个kv-pair的key是完整的，不和前一个restart的最后一个key共享任何前缀。这也是restart名字的由来：重新开始。所以，为了获得完整key，回溯到restart的第一个key即可：
 
 - 随机读：定位到被请求的restart，然后在本restart内从前到后搜索；
 - 反向迭代：restart从后到前，同一个restart内从前到后；可见，反向迭代`Prev()`还是明显比正向迭代代价高的；
 
-只要restart别太大，代价还是可控的。默认一个restart包含16个kv-pair。
+只要restart别太大，代价还是可以接受的。默认一个restart包含16个kv-pair。
 
 ## Block的Iterator (1.2)
+
+
+
 ## BlockBuilder (1.3)
 
 # Table (2)
