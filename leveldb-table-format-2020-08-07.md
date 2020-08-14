@@ -159,7 +159,7 @@ void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
 ---------------
 
 - `base_lg_`表示共享范围，默认为2K，这个值就是11（2^11=2K）；
-- 因为`0/2K`=`0.5K/2K=`1.2K/2K`=`0`，所以DataBlock 0,1,2共用filter-0。也就是，若两个DataBlock的offset在同一个2KB单元块内，则它们就共用同一个filter；
+- 因为`0/2K`=`0.5K/2K`=`1.2K/2K`=`0`，所以DataBlock 0,1,2共用filter-0。也就是，若两个DataBlock的offset在同一个2KB单元块内，则它们就共用同一个filter；
 - DataBlock-3开始于13K，占用filter-6，所以需要填入5个空filter。实际上它们不存在，只是在`offset_`部分填入5个空索引。这是为了保持`offset_`部分是一个数组，也就是可通过下标来查找：例如，一个DataBlock的offset是13K，那么它对应的就是filter-6，而filter-6的数据在offset_[6]处。如下：
 
 ```cpp
