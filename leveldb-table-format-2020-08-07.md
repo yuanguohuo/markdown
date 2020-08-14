@@ -112,16 +112,18 @@ Block支持3个Seek：
 
 一个Table包含一个IndexBlock。Index Block内包含一系列index，每个index是一个kv-pair，对应着一个DataBlock：
 
-- key：本DataBlock和下一DataBlock的key的分隔符，即字符串`x`，满足：本DataBlock中的最大key <= `x` < 下一DataBlock中的最小key；通常`x` = 本DataBlock中的最大key；
-- val：本DataBlock的handle，即本DataBlock在Table中的offset和size；
+- key：对应DataBlock和下一DataBlock的key的分隔符，即字符串`x`，满足：对应DataBlock中的最大key <= `x` < 下一DataBlock中的最小key；通常`x` = 对应DataBlock中的最大key；
+- val：对应DataBlock的handle，即对应DataBlock在Table中的offset和size；
 
-IndexBlock可以用于粗略定位一个key所在的DataBlock，例如`Table::InternalGet`函数：在`index_block`中seek，找到第一个key >= `target`的index $P_N$；$P_N$之前的index对应的DataBlock显然不可能包含`target`，因为它们的最大key < `target`；$P_N$对应的DataBlock的最大key >= `target`，所以`target`只可能在这个DataBlock中。然后就在这个DataBlock内寻找`target`。
+IndexBlock可以用于粗略定位一个key所在的DataBlock，例如`Table::InternalGet`函数：在`index_block`中seek，找到第一个满足`key >= target`的index，记为$P_N$；$P_N$之前的index对应的DataBlock显然不可能包含`target`，因为它们的最大key < `target`；$P_N$对应的DataBlock的最大key >= `target`，所以`target`只可能在这个DataBlock中。然后就在这个DataBlock内寻找`target`。
 
 IndexBlock还用于遍历本Table，见`Table::NewIterator`：它构造一个两层迭代器，上层迭代IndexBlock得到一个个index；下层迭代每个index对应的DataBlock。
 
 ## FilterBlock (2.3)
 
-一个Table包含一个FilterBlock；FilterBlock内包含多个filter；filter用于判定一个key有没有可能存在于一个DataBlock中，默认实现是BloomFilter。值得注意的是，filter和DataBlock不是一一对应的，多个DataBlock可能共用一个filter。这是没问题的：假如$DataBlock_M$，$DataBlock_{M+1}$，$DataBlock_{M+2}$共用一个filter，要判定$key_X$有没有可能存在于$DataBlock_{M+1}$中；若结果为false，那么$key_X$不可能存在于这3个DataBlock中的任何一个，当然也不可能存在于$DataBlock_{M+1}$；所以filter正确性是保证的。然而它增大了false-positive的可能性。为此，需要控制共用的范围：大约2KB数据共用一个filter：
+一个Table包含一个FilterBlock；FilterBlock内包含多个filter；filter用于判定一个key有没有可能存在于一个DataBlock中，默认实现是BloomFilter。
+
+值得注意的是，filter和DataBlock不是一一对应的，多个DataBlock可能共用一个filter。这是没问题的：假如$DataBlock_M$，$DataBlock_{M+1}$，$DataBlock_{M+2}$共用一个filter，现在来判定$key_X$有没有可能存在于$DataBlock_{M+1}$中；若结果为false，那么$key_X$不可能存在于这3个DataBlock中的任何一个，当然也不可能存在于$DataBlock_{M+1}$；所以filter正确性是保证的。然而，它增大了false-positive的可能性。为此，需要控制共用的范围，大约2KB数据共用一个filter：
 
 ```cpp
 // Generate new filter every 2KB of data
@@ -129,24 +131,21 @@ static const size_t kFilterBaseLg = 11;
 static const size_t kFilterBase = 1 << kFilterBaseLg;
 ```
 
-在FilterBlock的构造过程中，每当开始一个新DataBlock，不是立即为它创建一个filter，而是判断它是否可以和前面的DataBlock共用filter。判断的方式是，看这个DataBlock的offset是否跨越到下一个2KB块，逻辑如下：
+在FilterBlock的构造过程中，每当开始一个新DataBlock，不是立即为它创建一个filter，而是判断它是否可以和前面的DataBlock共用filter。判断的方式是，看这个DataBlock的offset是否跨越到下一个2KB单元块，逻辑如下：
 
 ```cpp
 void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
-  // DataBlock的offset位于哪个2KB块之内?
+  // DataBlock的offset位于哪个2KB单元块之内?
   uint64_t filter_index = (block_offset / kFilterBase);
   assert(filter_index >= filter_offsets_.size());
-  // 已经位于下一个2KB块之内了，需要新建一个filter。中间可能
-  // 跳过一些2KB块（前一个DataBlock太大了，例如10KB，导致当前
-  // DataBlock的offset一下跨到多个2KB块之后），为它们创建空
-  // 的filter;
+  // 已经位于下一个2KB单元块之内了，需要新建一个filter。
   while (filter_index > filter_offsets_.size()) {
     GenerateFilter();
   }
 }
 ```
 
-举个例子，顺便画出FilterBlock的结构图：
+正常情况比较容易理解，除了那个`while`。为什么是`while`而不是`if`呢？因为中间可能跳过一些2KB单元块：前一个DataBlock太大了，例如10KB，导致当前DataBlock的offset一下跨到多个2KB单元块之后，这就需要创建空的filter。举个例子，顺便画出FilterBlock的结构：
 
 - DataBlock-0 offset = 0;
 - DataBlock-1 offset = 0.5K;
@@ -160,7 +159,7 @@ void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
 ---------------
 
 - `base_lg_`表示共享范围，默认为2K，这个值就是11（2^11=2K）；
-- 因为`0/2K`=`0.5K/2K=`1.2K/2K`=`0`，所以DataBlock 0,1,2共用filter-0。也就是，若两个DataBlock的offset在同一个2KB块内，则它们就共用同一个filter；
+- 因为`0/2K`=`0.5K/2K=`1.2K/2K`=`0`，所以DataBlock 0,1,2共用filter-0。也就是，若两个DataBlock的offset在同一个2KB单元块内，则它们就共用同一个filter；
 - DataBlock-3开始于13K，占用filter-6，所以需要填入5个空filter。实际上它们不存在，只是在`offset_`部分填入5个空索引。这是为了保持`offset_`部分是一个数组，也就是可通过下标来查找：例如，一个DataBlock的offset是13K，那么它对应的就是filter-6，而filter-6的数据在offset_[6]处。如下：
 
 ```cpp
