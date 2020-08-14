@@ -5,7 +5,7 @@ tags: [leveldb, block, table]
 categories: leveldb
 ---
 
-LevelDB中table的结构。
+LevelDB中Table是一个比较复杂的结构。Block负责有序kv-pair的存储、查询及迭代；Table利用Block构造上一层的结构，包含Data Block, Index Block, Filter Block等，并管理这些Block之间的关系。
 
 <!-- more -->
 
@@ -23,11 +23,18 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 
 ## Block的结构 (1.1)
 
-一个Block可以看做一块连续的空间，可以在磁盘上，也可以加载到内存中。它的布局是这样的：
+一个Block可以看做一块连续的空间，布局是这样的：
 
 - 从基地址`data_`开始，是一个个紧密排列的kv-pair；这些kv-pair被分为多个“段”，叫做restart（后面会讲为什么叫么一个奇怪的名字）。默认每个restart包含16个kv-pair；
 - 这些kv-pair之后，即从`data_ + restart_offset_`开始，是一个`uint32_t`数组；每个`uint32_t`元素表示一个restart的偏移（相对于基地址`data_`）；所以前面有多少restart，这个数组里就有多少元素；
-- 最后是一个`uint32_t`，表示有多少个restart，即前面数组中有多少元素，叫做`NumRestarts`；
+- 后面是一个`uint32_t`，表示有多少个restart，即前面数组中有多少元素，叫做`NumRestarts`；
+
+以上是Block在内存中的布局；若被存储到磁盘上，还包括：
+
+- 1字节压缩算法。若没压缩则为`kNoCompression`，默认是`kSnappyCompression`；
+- 4字节CRC；
+
+它们是Block的存储属性，而不是Block本身的内容，下图没有画出来。
 
 {% asset_img block-format.jpg Block Format %}
 
@@ -74,7 +81,7 @@ Block支持3个Seek：
 构建一个Block，就是往Block中增加kv-pair，其逻辑在`BlockBuilder::Add()`函数：
 
 - 一个restart未满，则计算当前key和前一个key的公共前缀长度`shared`；
-- 否则，一个restart已满，则把当时`buffer_.size()`记下来，存到数组中。注意，这个值是下一个restart的起始offset（第一个restart的起始offset为0，初始化的时候就记录到数组中了）。而当前kv-pair是新restart的第一个，故`shared`为0。
+- 否则，一个restart已满，则把当时`buffer_.size()`记下来，存到数组中。注意，这个值是下一个restart的起始offset（第一个restart的起始offset为0，初始化的时候就记录到数组中了）。而当前kv-pair是新restart的第一个，`shared`被置0。
 - 把一个kv-pair的5个部分存入`buffer_`：shared key长度，non-shared key长度，value长度，non-shared key数据，value数据。
 
 加入kv-pair之后，`BlockBuilder::Finish()`结束Block构建：
@@ -86,6 +93,93 @@ Block支持3个Seek：
 
 # Table (2)
 
-## 数据Block (2.1)
-## Index Block (2.2)
-## Filter Block (2.3)
+抛却其内部细节，Block就是一个kv-pair的存储，主要支持迭代操作。基于Block，Table构筑上层结构：
+
+---------------
+     图
+---------------
+
+## DataBlock (2.1)
+
+一个Table包含多个DataBlock；
+
+- Block内是严格按key排序的，没有重复key；
+- Block间也是按key排序的，且两个Block没有交集。
+
+它们是Table的主体，后续IndexBlock和FilterBlock等，都是方便索引、寻找、迭代DataBlock以及其中的kv-pair；
+
+## IndexBlock (2.2)
+
+一个Table包含一个IndexBlock。Index Block内包含一系列index，每个index是一个kv-pair，对应着一个DataBlock：
+
+- key：本DataBlock和下一DataBlock的key的分隔符，即字符串`x`，满足：本DataBlock中的最大key <= `x` < 下一DataBlock中的最小key；通常`x` = 本DataBlock中的最大key；
+- val：本DataBlock的handle，即本DataBlock在Table中的offset和size；
+
+IndexBlock可以用于粗略定位一个key所在的DataBlock，例如`Table::InternalGet`函数：在`index_block`中seek，找到第一个key >= `target`的index $P_N$；$P_N$之前的index对应的DataBlock显然不可能包含`target`，因为它们的最大key < `target`；$P_N$对应的DataBlock的最大key >= `target`，所以`target`只可能在这个DataBlock中。然后就在这个DataBlock内寻找`target`。
+
+IndexBlock还用于遍历本Table，见`Table::NewIterator`：它构造一个两层迭代器，上层迭代IndexBlock得到一个个index；下层迭代每个index对应的DataBlock。
+
+## FilterBlock (2.3)
+
+一个Table包含一个FilterBlock；FilterBlock内包含多个filter；filter用于判定一个key有没有可能存在于一个DataBlock中，默认实现是BloomFilter。值得注意的是，filter和DataBlock不是一一对应的，多个DataBlock可能共用一个filter。这是没问题的：假如$DataBlock_M$，$DataBlock_{M+1}$，$DataBlock_{M+2}$共用一个filter，要判定$key_X$有没有可能存在于$DataBlock_{M+1}$中；若结果为false，那么$key_X$不可能存在于这3个DataBlock中的任何一个，当然也不可能存在于$DataBlock_{M+1}$；所以filter正确性是保证的。然而它增大了false-positive的可能性。为此，需要控制共用的范围：大约2KB数据共用一个filter：
+
+```cpp
+// Generate new filter every 2KB of data
+static const size_t kFilterBaseLg = 11;
+static const size_t kFilterBase = 1 << kFilterBaseLg;
+```
+
+在FilterBlock的构造过程中，每当开始一个新DataBlock，不是立即为它创建一个filter，而是判断它是否可以和前面的DataBlock共用filter。判断的方式是，看这个DataBlock的offset是否跨越到下一个2KB块，逻辑如下：
+
+```cpp
+void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
+  // DataBlock的offset位于哪个2KB块之内?
+  uint64_t filter_index = (block_offset / kFilterBase);
+  assert(filter_index >= filter_offsets_.size());
+  // 已经位于下一个2KB块之内了，需要新建一个filter。中间可能
+  // 跳过一些2KB块（前一个DataBlock太大了，例如10KB，导致当前
+  // DataBlock的offset一下跨到多个2KB块之后），为它们创建空
+  // 的filter;
+  while (filter_index > filter_offsets_.size()) {
+    GenerateFilter();
+  }
+}
+```
+
+举个例子，顺便画出FilterBlock的结构图：
+
+- DataBlock-0 offset = 0;
+- DataBlock-1 offset = 0.5K;
+- DataBlock-2 offset = 1.2K; 这个DataBlock很大，直到13K-1处;
+- DataBlock-3 offset = 13K;
+- DataBlock-4 offset = 14.8K;
+- DataBlock-5 offset = 15.1K;
+
+---------------
+     图
+---------------
+
+- `base_lg_`表示共享范围，默认为2K，这个值就是11（2^11=2K）；
+- 因为`0/2K`=`0.5K/2K=`1.2K/2K`=`0`，所以DataBlock 0,1,2共用filter-0。也就是，若两个DataBlock的offset在同一个2KB块内，则它们就共用同一个filter；
+- DataBlock-3开始于13K，占用filter-6，所以需要填入5个空filter。实际上它们不存在，只是在`offset_`部分填入5个空索引。这是为了保持`offset_`部分是一个数组，也就是可通过下标来查找：例如，一个DataBlock的offset是13K，那么它对应的就是filter-6，而filter-6的数据在offset_[6]处。如下：
+
+```cpp
+bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
+  // filter的索引；
+  uint64_t index = block_offset >> base_lg_;
+  if (index < num_) {
+    // start: 根据filter的索引，查offset_数组，得到的filter数据的位置;
+    // limit: 下一个filter数据的位置，也就是当前filter数据结束的地方;
+    uint32_t start = DecodeFixed32(offset_ + index * 4);
+    uint32_t limit = DecodeFixed32(offset_ + index * 4 + 4);
+    if (start <= limit && limit <= static_cast<size_t>(offset_ - data_)) {
+      Slice filter = Slice(data_ + start, limit - start);
+      return policy_->KeyMayMatch(key, filter);
+    } else if (start == limit) {
+      // Empty filters do not match any keys
+      return false;
+    }
+  }
+  return true;  // Errors are treated as potential matches
+}
+```
