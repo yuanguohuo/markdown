@@ -95,9 +95,11 @@ Block支持3个Seek：
 
 抛却其内部细节，Block就是一个kv-pair的存储，主要支持迭代操作。基于Block，Table构筑上层结构：
 
----------------
-     图
----------------
+{% asset_img table.jpeg TableFormat %}
+
+它本质上是一个树形结构：
+
+{% asset_img table-tree.jpeg TableTreeFormat %}
 
 ## DataBlock (2.1)
 
@@ -154,9 +156,7 @@ void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
 - DataBlock-4 offset = 14.8K;
 - DataBlock-5 offset = 15.1K;
 
----------------
-     图
----------------
+{% asset_img filter-block.jpeg TableTreeFormat %}
 
 - `base_lg_`表示共享范围，默认为2K，这个值就是11（2^11=2K）；
 - 因为`0/2K`=`0.5K/2K`=`1.2K/2K`=`0`，所以DataBlock 0,1,2共用filter-0。也就是，若两个DataBlock的offset在同一个2KB单元块内，则它们就共用同一个filter；
