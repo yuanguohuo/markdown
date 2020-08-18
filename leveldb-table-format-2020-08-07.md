@@ -5,7 +5,7 @@ tags: [leveldb, block, table]
 categories: leveldb
 ---
 
-LevelDB中Table是一个比较复杂的结构。Block负责有序kv-pair的存储、查询及迭代；Table利用Block构造上一层的结构，包含Data Block, Index Block, Filter Block等，并管理这些Block之间的关系。
+LevelDB中Table是一个比较复杂的结构。Block负责有序kv-pair的存储、查询及迭代；Table利用Block构造上一层的结构，包含Data Block, Index Block, Filter Block等，并管理这些Block之间的关系。本篇记录这些琐碎细节。
 
 <!-- more -->
 
@@ -133,7 +133,7 @@ static const size_t kFilterBaseLg = 11;
 static const size_t kFilterBase = 1 << kFilterBaseLg;
 ```
 
-在FilterBlock的构造过程中，每当开始一个新DataBlock，不是立即为它创建一个filter，而是判断它是否可以和前面的DataBlock共用filter。判断的方式是，看这个DataBlock的offset是否跨越到下一个2KB单元块，逻辑如下：
+在FilterBlock的构造过程中，每当开始一个新DataBlock，不是立即为前面的DataBlock创建一个filter，而是判断这个新DataBlock是否可以和前面的DataBlock共用filter。判断的方式是，看这个DataBlock的offset是否跨越了2KB单元块，逻辑如下：
 
 ```cpp
 void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
@@ -182,3 +182,28 @@ bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
   return true;  // Errors are treated as potential matches
 }
 ```
+
+## TableBuilder (2.4)
+
+Table构建的逻辑在`TableBuilder::Add`中:
+
+1. 初始时`r->pending_index_entry`为`false`；当kv-pair添加进来，就把它添加到DataBlock和FilterBlock。当越来越多的kv-pair被添加进来，一个DataBlock就满了。
+2. DataBlock满了之后，就调用`Flush`把它写到文件中，其中做了几个比较重要的事。
+    * a. 构建DataBlock，压缩并写入文件；
+    * b. 记录这个DataBlock的index handle，即这个DataBlock在Table中的offset和size；
+    * c. 把`r->pending_index_entry`设置为`true`，表示需要在IndexBlock中添加一个index（为本DataBlock建索引）；
+    * d. 调用`filter_block->StartBlock`，告诉FilterBlock一个新的DataBlock要开始了。若新的DataBlock的offset跨越了2KB单元块，则为前面累积的kv-pair生成filter，并清空以便重新积累；
+3. 满DataBlock之后的第一个kv-pair被添加时，`r->pending_index_entry`为`true`（2.c步），为它建立index，其中index handle已经在2.b步记录了。
+
+
+## Table的对外接口 (2.5)
+
+主要是以下3个函数：
+
+- `Open`函数从一个文件恢复Table的内存结构；
+- `NewIterator`函数返回一个迭代器，迭代本Table存储的所有kv-pair。它是一个两层迭代器，上层在IndexBlock中迭代，得到一个个index（每个index对应一个DataBlock）；下层在DataBlock中迭代，得到一个个kv-pair。当下层迭代器耗尽时，从上层迭代器获取一个index，打开它对应的DataBlock。`Seek`过程也是类似，先Seek上层，得到一个index；然后再Seek这个index对应的DataBlock；
+- `InternalGet`是一个私有函数，所以只有friend类`TableCache`可以调用。这个函数和Seek类似，先Seek上层再Seek下层，然后对找到的kv-pair调用给定的回调函数。
+
+# 小结 (3)
+
+本篇介绍Block和Table的结构，以及它们对外提供的接口（主要是Iterator）。为后续version和version set打下基础。
