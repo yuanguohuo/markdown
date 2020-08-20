@@ -117,7 +117,9 @@ Block支持3个Seek：
 - key：对应DataBlock和下一DataBlock的key的分隔符，即字符串`x`，满足：对应DataBlock中的最大key <= `x` < 下一DataBlock中的最小key；通常`x` = 对应DataBlock中的最大key；
 - val：对应DataBlock的handle，即对应DataBlock在Table中的offset和size；
 
-IndexBlock可以用于粗略定位一个key所在的DataBlock，例如`Table::InternalGet`函数：在`index_block`中seek，找到第一个满足`key >= target`的index，记为$P_N$；$P_N$之前的index对应的DataBlock显然不可能包含`target`，因为它们的最大key < `target`；$P_N$对应的DataBlock的最大key >= `target`，所以`target`只可能在这个DataBlock中。然后就在这个DataBlock内寻找`target`。
+IndexBlock可以用于定位一个key所在的DataBlock，例如`Table::InternalGet`函数，它包含在Table中Seek一个key的逻辑：
+1. 在`index_block`中Seek，找到第一个满足`key >= target`的index，记为$P_N$。显然，$P_N$之前的index所对应的DataBlock不可能包含`target`，因为它们的最大key < `target`；而$P_N$对应的DataBlock的最大key >= `target`，所以`target`只可能在这个DataBlock中（后续的DataBlock也不可能包含`target`，因为它们的最小key > `target`）；
+2. 在这个DataBlock内Seek `target`；
 
 IndexBlock还用于遍历本Table，见`Table::NewIterator`：它构造一个两层迭代器，上层迭代IndexBlock得到一个个index；下层迭代每个index对应的DataBlock。
 
@@ -201,8 +203,8 @@ Table构建的逻辑在`TableBuilder::Add`中:
 主要是以下3个函数：
 
 - `Open`函数从一个文件恢复Table的内存结构；
-- `NewIterator`函数返回一个迭代器，迭代本Table存储的所有kv-pair。它是一个两层迭代器，上层在IndexBlock中迭代，得到一个个index（每个index对应一个DataBlock）；下层在DataBlock中迭代，得到一个个kv-pair。当下层迭代器耗尽时，从上层迭代器获取一个index，打开它对应的DataBlock。`Seek`过程也是类似，先Seek上层，得到一个index；然后再Seek这个index对应的DataBlock；
-- `InternalGet`是一个私有函数，所以只有friend类`TableCache`可以调用。这个函数和Seek类似，先Seek上层再Seek下层，然后对找到的kv-pair调用给定的回调函数。
+- `NewIterator`函数返回一个迭代器，迭代本Table存储的所有kv-pair。它是一个两层迭代器，上层在IndexBlock中迭代，得到一个个index（每个index对应一个DataBlock）；下层在DataBlock中迭代，得到一个个kv-pair。当下层迭代器耗尽时，从上层迭代器获取一个index，打开它对应的DataBlock。
+- `InternalGet`是一个私有函数，所以只有friend类`TableCache`可以调用。它Seek一个key，然后对找到的kv-pair调用给定的回调函数。Seek逻辑见IndexBlock（2.2节）。
 
 # 小结 (3)
 
