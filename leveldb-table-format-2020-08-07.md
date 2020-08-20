@@ -69,7 +69,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 Block支持3个Seek：
 
 - `SeekToFirst` ：seek到本Block的第一个restart，然后parse出restart内的第一个kv-pair；
-- `Seek(target)`：1. 使用二分查找法定位到$restart_X$，满足：$restart_X$的第一个key（注意第一个key是完整的）< `target`，且$restart_{X+1}$的第一个key >= `target`；2. 从$restart_X$的第一个key（注意它是完整的）开始找第一个 >= `target`的kv-pair；
+- `Seek(target)`：1. 使用二分查找法定位到$restart_X$，满足：$restart_X$的第一个key（注意第一个key是完整的）< `target`，且$restart_{X+1}$的第一个key >= `target`；2. 从$restart_X$的第一个key（注意它是完整的）开始找第一个 >= `target`的kv-pair（可能在$restart_X$中，也可能是$restart_{X+1}$的第一个key）；
 - `SeekToLast`  ：seek到最后一个restart，然后从第一个kv-pair开始解析到最后一个kv-pair；
 
 注意对于`Seek`和`SeekToLast`，都需要先seek到一个restart，然后从它的第一个key开始解析。原因前面已经说过。
