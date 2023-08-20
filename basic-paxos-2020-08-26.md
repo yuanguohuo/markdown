@@ -9,7 +9,7 @@ categories: paxos
 
 <!-- more -->
 
-# 1. 引言
+# 引言 (1)
 
 Paxos是公认的最晦涩的协议之一，并且协议和实现之间有着巨大的鸿沟。然而，Paxos却是最重要的一致性协议，甚至成为一致性的代名词。Mike Burrows, inventor of the Chubby service at Google, says that “there is only one consensus protocol, and that’s Paxos”。所以理解Paxos至关重要。Raft只是Paxos的一个简化版本，且性能不及Paxos，但它却因容易理解和实现而迅速流行。我最初接触的是Paxos，理解不很深刻；后来的项目中使用Raft，一下子开朗了很多。机缘巧合，目前项目采用的ceph实现了Paxos，所以我趁此机会再次梳理它：结合ceph-mon中的实现，从Raft的角度，重读论文，理解了大神John Ousterhout和Diego Ongaro根据Paxos提出Raft的思路。这里把心路历程总结一下，方便以后查阅，也希望能和大家交流。理解不到位甚至不正确的地方，还望指正。
 
@@ -26,7 +26,7 @@ Paxos是公认的最晦涩的协议之一，并且协议和实现之间有着巨
 
 {% asset_img replicated-state-machine.png replicated-state-machine %}
 
-# 2. 问题
+# 问题 (2)
 
 首先明确，Basic-Paxos的目的是：选定一个值。这与Replicated Logs还相差甚远，但它是形成Replicated Logs的基石：一个Basic-Paxos实例确定一条Log的值，即就一条Log达成一致。一个Basic-Paxos实例内可能发生多轮投票，但最终就是选定一个值。很多人认为每一轮确定一条Log的值，甚至有些文章都这么写，这就谬以千里了。重申一遍，Basic-Paxos不解决Replicated Logs的问题，只是选定一条Log的值。至于如何实现Replicated Logs，我将在Multi-Paxos讲述，现在着眼于如何选定一个值。
 
@@ -46,7 +46,7 @@ Paxos是公认的最晦涩的协议之一，并且协议和实现之间有着巨
 
 除了安全需求，还有一个Progress需求，即只要足够多的实体活着，就应该能选定一个值，不能无限空转下去。Basic-Paxos也不解决这个问题，只是这个问题比较容易解决。见第7节。
 
-# 3. 角色
+# 角色 (3)
 
 针对上述问题，为了方便描述，抽象出以下3中角色。注意，角色是抽象的，第2节中的"进程"同时担任这3中角色。
 
@@ -56,9 +56,9 @@ Paxos是公认的最晦涩的协议之一，并且协议和实现之间有着巨
 
 {% asset_img basic-paxos-roles.png basic-paxos-roles %}
 
-# 4. 流程
+# 流程 (4)
 
-## 4.1 Prepare阶段
+## Prepare阶段 (4.1)
 
 - Prepare(a)：Proposer生成一个PN，设为n，然后向majority个Acceptor发送Prepare请求。Prepare请求只包含PN不包含Value，记作`PrepareReq{n}`。
 - Prepare(b)：一个Acceptor收到PrepareReq{n}时，若`n>MaxRespondedPN`(即满足下面承诺1)就**响应(respond)**它。**响应**是指持久化`MaxRespondedPN=n`，并作如下"两个承诺，一个应答"。其中`MaxRespondedPN`是**自己曾经响应过的最大的PN**，它只是一个PN，没有Value。
@@ -69,7 +69,7 @@ Paxos是公认的最晦涩的协议之一，并且协议和实现之间有着巨
 
 Prepare阶段的作用是什么？Raft中并没有类似的阶段(其实，最终会发现，Prepare就是Raft的选主阶段)。这会涉及到Basic-Paxos中的最难点，第6节通过一些例子总结其作用；第11.2节也能看出其重要性。
 
-## 4.2 Accept阶段
+## Accept阶段 (4.2)
 
 - Accept(a)：若Proposer收到majority数量个PrepareResp{Promise{n, Proposal}}，就pick一个Value，设为v，并向所有Acceptor发送Accept请求。Accept请求包含完整的Proposal(PN和Value)，记作`AcceptReq{Proposal{n, v}}`。怎么pick Value呢？查看已经收到的这majority个PrepareResp{Promise{n, Proposal}}:
 
@@ -85,7 +85,7 @@ Prepare阶段的作用是什么？Raft中并没有类似的阶段(其实，最�
 
 熟悉Raft的同学可能会有疑问：Acceptor怎么没有向Proposer返回接受应答？Proposer也没有在接收到majority个应答之后选定Value？实现上可能确实这么做(比如ceph-monitor的Paxos实现)，但模型上，这是学习阶段的事，见第4.3节。
 
-## 4.3 Learn阶段
+## Learn阶段 (4.3)
 
 在Accept(b)阶段，Acceptor在接受(accept)一个AcceptReq{Proposal{n, v}}的时候，会把Proposal发给Learner；Learner在接收到majority个Proposal{n, v}的时候，就**学习**到：Proposal{n, v}被选定(chosen)了，也称作v被选定了。
 
@@ -100,7 +100,7 @@ Proposal(及其Value)虽然是由Acceptor选定的，但是，是由Learner发�
 
 还有一个问题，假如majority个Acceptor都接受了一个Proposal，但所有的中转Learner都死了；等它们恢复的时候，就学习不到那个被选定的Proposal。一个直观的想法是，让Learner去轮询Acceptor，若能收到majority个相同的Proposal就知道它被选定了。但这是行不通的：因为轮询的时候可能又有Acceptor死了，Learner收不到majority个相同的Proposal。可行的办法是，Learner请求Proposer重新提议；根据算法的保证，在新的一轮中选定的一定是相同的Value，所以Learner在新一轮能学习成功即可。第6节的例4和这个场景类似。
 
-# 5. 角色映射
+# 角色映射 (5)
 
 前面说到，熟悉Raft的同学可能会有疑问：Acceptor应该向Proposer返回接受应答，Proposer接收到majority个应答之后就选定Value。本节以ceph-monitor的Paxos为例，解释它们其实是一致的。
 
@@ -117,7 +117,7 @@ Proposal(及其Value)虽然是由Acceptor选定的，但是，是由Learner发�
 
 是不是和Raft非常一致？
 
-# 6. 举例
+# 举例 (6)
 
 在推导（见第11节）之前，先通过一些例子直观感受一下Basic Paxos的运行过程，并尝总结其背后逻辑：虽然Prepare和Accept两个阶段看上去也不复杂，但是"唯一性"是怎么保证的？Prepare阶段的作用是什么？这些问题却不直观。
 
@@ -208,7 +208,7 @@ Proposal(及其Value)虽然是由Acceptor选定的，但是，是由Learner发�
 
 注意：通过第r步可以看出**Prepare的第二个作用：发现已被选定的值**。这一点非常重要，因为从在第p步P2生成了一个更大的PN，在一切正常的情况下它pick的值将会被选定。但问题是，之前W已经被选定了。所以，算法必须保证P2在第r步中会pick W。如何保证呢？就是通过Prepare阶段询问majority个Acceptor，各自接受过什么Proposal，然后找出PN最大的那个，其值就一定是W。其原因留待第11.2节解释。
 
-# 7. Progress
+# Progress (7)
 
 Basic-Paxos可能出现活锁的情况：
 
@@ -243,7 +243,7 @@ Basic-Paxos可能出现活锁的情况：
 
 另外，在第8节中将看到，把这个过程叫做选Leader并不合适，这里暂且这么叫。
 
-# 8. 思考
+# 思考 (8)
 
 在Basic-Paxos流程中，Accept和Learn阶段非常容易理解：就是一个Proposal若被多数派接受，就选定了。我们试图加深对Prepare理解。用白话说Prepare就是这样的：
 
@@ -273,7 +273,7 @@ Basic-Paxos可能出现活锁的情况：
 
 明确了Prepare的本质就是选举，就很容易想到，每次提一个Proposal都选举一次是明显的浪费。Multi-Paxos的一个优化就在于此，这是后话。
 
-# 9. 细节与优化
+# 细节与优化 (9)
 
 论文[1]上说：Proposer把PrepareReq发给一个majority集合，等收到它们的PrepareResp的时候，再把AcceptReq{Proposal}发给同一majority集合。这里有两个细节：
 
@@ -336,7 +336,7 @@ John Ousterhout和Diego Ongaro在Paxos Summary[3]中也描述了Proposer如何�
 
 - **优化4**：Prepare阶段，n和MaxRespondedPN的比较关系使用**大于等于**。这样，两个阶段的比较就一致了，比较好记。不过从效率上讲，重复持久化一次没有必要。好在这种情况在实现上不会发生，因为高层协议比如RPC能够处理网络重传。
 
-# 10. 重新描述
+# 重新描述 (10)
 
 基于第9节对一些细节的讨论和优化，我们重新描述完整的Basic-Paxos流程。首先：
 
@@ -389,13 +389,13 @@ John Ousterhout和Diego Ongaro在Paxos Summary[3]中也描述了Proposer如何�
 Proposer：maxRound；
 Acceptor: MaxRespondedPN和MaxAcceptedProposal；
 
-# 11. 推导
+# 推导 (11)
 
 前面描述了Basic-Paxos的流程，并使用例子的方式详细解释它是如何运行的，本节介绍推导过程。推导方式和论文[1]类似：从问题出发，提出一个草案，发现草案中的矛盾点，修正草案，如此反复直到问题解决。但这里尽量使过程容易理解，特别是放弃论文中的"在归纳证明中提出方法"的方式（这一点很不好理解，通常是先提出方法然后再证明方法有效），而采用一种不严谨但很符合直觉的方式，见第11.2节。
 
 问题已于第2节提出，下面直接针对问题提出草案并进行修正。
 
-## 11.1 过程
+## 过程 (11.1)
 
 **草案1 - Single Acceptor**
 
@@ -448,7 +448,7 @@ Acceptor: MaxRespondedPN和MaxAcceptedProposal；
 
 到目前为止，推理都是显而易见的，问题最终归结于**如何做到R3**。在解决这问题之前（下一节），我们体会一下引入Proposal（特别是其中的PN）的意义：Proposal的引入，使我们能够对Proposer发出的提议进行排序。假如没有顺序，由于网络延迟、重传等原因，导致各个角色接收消息的顺序和消息被发出的顺序不同，例如Acceptor1先接收到v1后接收到v2，而Acceptor2先接收到v2后接收到v1；Acceptor3接收到一个十分钟之前提议的v3如何处理，如此等等，使问题异常复杂。不是说不排序就一定无解，但Basic-Paxos的解是基于顺序的：可以看见，前面的推导逻辑是基于顺序一步步把问题归结于R3的。到目前，问题已经相当清晰了：只要能够满足R3，草案4就是可行的。
 
-## 11.2 证明
+## 证明 (11.2)
 
 如何满足R3呢，方法就是**引入Prepare阶段**，Proposer在收到majority个PrepareResp之后，需要pick一个Value进行提议：
 
@@ -480,7 +480,7 @@ Acceptor: MaxRespondedPN和MaxAcceptedProposal；
 
 这就证明了：一旦Proposal{n,v}被选定，以后的Proposer只可能pick到值v。
 
-# 12. 小结
+# 小结 (12)
 
 抛开形式化证明，Basic-Paxos本来还是比较易懂的，但是Lamport大神从证明推导出方法的论述方式不容易理解，大家还是习惯于先给出方法，然后证明这个方法是正确的。然而这已经是"Paxos Made Simple"了。不管怎样，至此Basic-Paxos已经比较清楚了，并且已经可以看出Raft的雏形：
 
@@ -488,7 +488,7 @@ Acceptor: MaxRespondedPN和MaxAcceptedProposal；
 - Raft一次选举，多次Propose；而Basic-Paxos一次选举(Prepare)，只Propose一次；
 - Raft选举的时候能够保证所选出的Leader一定拥有所有committed logs，所以不需要从Follower拉取Log；而Basic-Paxos不能保证这一点（只要能生成足够大的PN就能够当选为Leader），所以选举（Prepare）的时候，需要把committed value搜集过来（即PrepareResp里附带的MaxAcceptedProposal）；
 
-# 13. 参考文献
+# 参考文献 (13)
 
 1. [Paxos Made Simple](https://lamport.azurewebsites.net/pubs/paxos-simple.pdf)
 2. [Paxos summary](https://ongardie.net/static/raft/userstudy/paxossummary.pdf)
