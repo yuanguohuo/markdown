@@ -11,11 +11,12 @@ categories: cpu
 
 # mpstat命令 (1)
 
-这个工具的主要功能有2个：CPU使用率(`-u`选项)和CPU的中断及软中断数(`-I SUM|CPU|SCPU|ALL`选项)。这两种模式下，都可以使用`-P`选项来选择CPU。
+这个工具的主要功能有2个：查看CPU使用率(`-u`选项)和CPU的中断数(`-I SUM|CPU|SCPU|ALL`选项)。这两种模式下，都可以使用`-P`选项来选择processor。
 
 命令的格式是:
+
 ```
-mpstat [选项] [interval [count]]
+mpstat {CPU使用率or中断数} [interval [count]]
 ```
 
 以interval为间隔，输出count次；假如不带interval和count，就输出1次；带interval不带count就持续输出。
