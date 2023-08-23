@@ -16,8 +16,8 @@ categories: cpu
 命令的格式是:
 ```
 mpstat [选项] [interval [count]]
-
 ```
+
 以interval为间隔，输出count次；假如不带interval和count，就输出1次；带interval不带count就持续输出。
 
 ## CPU使用率(`-u`选项，其实默认就是`-u`，可以不加) (1.1)
