@@ -36,6 +36,11 @@ KVM只靠这两个内核模块也不能创建完整的虚拟机，所以KVM团�
 这里有一个操作过程，虽然有点老，但可以看出qemu的使用方式。
 https://subscription.packtpub.com/book/virtualization_and_cloud/9781788294676/1
 
+![figure1](kvm-qemu.png)
+<div style="text-align: center;"><em>图1</em></div>
+
+
+
 # Qemu的3种模式 (2)
 
 ## Full-system emulation  (2.1)
@@ -95,3 +100,7 @@ Although the purpose and goals of Type 1 and Type 2 hypervisors are identical, t
 - KVM is part of Linux. Linux is part of KVM.
 
 KVM把Linux变成了bare-metal hypervisor。或者说，使用KVM生产虚拟机时，KVM变成主体，Linux就变成a part of KVM，KVM通过Linux的能力管理内存、CPU及其它设备。这样KVM（包扩Linux）就像ESXi一样，是一个Type 1 hypervisor（虽然它看起来还像一个普通Linux系统）。所以，这种情况下，不能认为KVM就是两个Linux内核模块，相反，Linux是KVM的一部分。KVM（包括Linux）变成Linux hypervisor。
+
+KVM allows Linux to function as a hypervisor, so a host machine can run multiple isolated virtual environments called guests. KVM basically provides Linux with hypervisor capabilities. This means that the hypervisor components such as memory manager, scheduler, network stack, etc. are provided as part of the Linux kernel. The VMs are regular Linux processes scheduled by a standard Linux scheduler with dedicated virtual hardware such as network adapters.
+
+
