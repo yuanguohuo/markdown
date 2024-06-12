@@ -1,11 +1,13 @@
 ---
-title: Qemu和KVM 
+title: 虚拟化入门笔记--Qemu和KVM
 date: 2024-03-29 13:18:13
 tags: [qemu,kvm]
 categories: kvm
 ---
 
 简要说明linux虚拟化套件中的一些术语，特别是qemu, KVM, hypervisor；以及它们的区别与联系。
+
+<!-- more -->
 
 # Qemu和kvm的区别与联系 (1)
 

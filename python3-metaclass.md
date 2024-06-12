@@ -7,6 +7,8 @@ categories: Python3
 
 简要记录Python3中的metaclass。注意本文是基于new-style class的。Python3中所有class都是new-style class，Python2则不同：Python2.2以前根本不支持new-style class，而从Python2.2开始，虽然支持但需要显示地声明。
 
+<!-- more -->
+
 # 一切皆对象 (1)
 
 在Python中，一切都是对象，比如: `int`, `3`, 自定义类的实例`foo`，以及自定义类`Foo`，所以下面的语句都打印`True`:

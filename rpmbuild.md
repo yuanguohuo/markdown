@@ -7,6 +7,8 @@ categories: rpm
 
 简要记录如何编写spec文件来打rpm包。
 
+<!-- more -->
+
 # 安装 (1)
 
 以CentOS-7为例：
@@ -24,7 +26,7 @@ rpmdev-setuptree
 - `lua-devel-5.3.6-1.el7.x86_64.rpm`
 - `lua-static-5.3.6-1.el7.x86_64.rpm`
 
-第一个叫main package。打单个rpm包(main package)是打多个包的特例，不比细说。
+第一个叫main package。打单个rpm包(main package)是打多个包的特例，不必细说。
 
 Spec文件主要包含：
 
