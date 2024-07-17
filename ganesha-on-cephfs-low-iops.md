@@ -295,11 +295,17 @@ void Client::send_cap(Inode *in, MetaSession *session, Cap *cap,
 所以，根因是ganesha调用libcephfs的`ceph_ll_fsync`时传入`syncdataonly=false`。尝试通过fio的`fsync`和`fdatasync`选项来控制这个参数，也不起作用。而ceph-fuse是可以通过这两个选项控制的。具体对比：
 
 | fio选项                  | nfs-ganesha        | ceph-fuse          |
-|--------------------------+--------------------+--------------------|
+|--------------------------|--------------------|--------------------|
 | --direct=1               | sync data+metadata | no sync            |
 | --direct=1 --fsync=1     | sync data+metadata | sync data+metadata |
 | --direct=1 --fdatasync=1 | sync data+metadata | sync data-only     |
 
 并且，ceph-fuse在`--direct=1 --fsync=1`时(也要sync data+metadata)，表现的和nfsv4一模一样：metadata pool上有很大的带宽，iops很低...
 
-看ganesha的代码发现，所有对`ceph_ll_fsync`的调用，参数`syncdataonly`都为false。暴力修改src/FSAL/FSAL_CEPH/handle.c中`ceph_fsal_write2()`函数中的调用参数，iops就会达到ceph-fuse的水平，并且metadata pool上没有带宽。问题是这么修改安全吗？
+看ganesha的代码发现，所有对`ceph_ll_fsync`的调用参数`syncdataonly`都为false。暴力修改src/FSAL/FSAL_CEPH/handle.c中`ceph_fsal_write2()`函数中的调用参数为true，iops就会达到ceph-fuse的水平，并且metadata pool上没有带宽。问题是这么修改安全吗？
+
+# 下一步 (4)
+
+- 评估上述修改是否安全；
+- libcephfs给mds发capability update请求，mds的perf统计中为什么体现不出来？
+- capability update为什么有1900多字节之多？
