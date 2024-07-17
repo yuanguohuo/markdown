@@ -2,7 +2,7 @@
 title: NFS-Ganesha对接CephFS时iops很低
 date: 2024-07-17 17:01:33
 tags: [ganesha,nfs,cephfs]
-categories: ceph
+categories: nas
 ---
 
 NFS-Ganesha对接CephFS时iops很低，记录排查过程。Ceph版本14.2.11；NFS-Ganesha版本2.8.4。

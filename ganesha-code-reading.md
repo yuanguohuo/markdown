@@ -2,7 +2,7 @@
 title: NFS-Ganesha代码阅读笔记
 date: 2024-07-17 19:55:38
 tags: [nfs,ganesha]
-categories: ganesha
+categories: nas
 ---
 
 阅读NFS-Ganesha代码(version 2.8.4)，记录要点，方便查阅。
@@ -348,16 +348,16 @@ NFS4.0协议原文:
 
 ```
 
-            client                                         server
+     client                                     server
 
-                   arg:
-                     seqid
-                     open_owner(clientid+chararray)
-Open        ------------------------------------------>    create state_owner_t inst
-                                                                    type: STATE_OPEN_OWNER_NFSV4
-                                                                    so_owner_val=chararray
-                                                                    so_owner_len=lengthof(chararray)
-                                                                    so_owner.so_nfs4_owner
+            arg:
+              seqid
+              open_owner(clientid+chararray)
+Open        ----------------------------------> create state_owner_t inst
+                                                  type: STATE_OPEN_OWNER_NFSV4
+                                                  so_owner_val=chararray
+                                                  so_owner_len=lengthof(chararray)
+                                                  so_owner.so_nfs4_owner
 
 ```
 
