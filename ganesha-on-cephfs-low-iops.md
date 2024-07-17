@@ -307,5 +307,6 @@ void Client::send_cap(Inode *in, MetaSession *session, Cap *cap,
 # 下一步 (4)
 
 - 评估上述修改是否安全；
+- 看ceph-fuse是如何支持fdatasync的；
 - libcephfs给mds发capability update请求，mds的perf统计中为什么体现不出来？
 - capability update为什么有1900多字节之多？
