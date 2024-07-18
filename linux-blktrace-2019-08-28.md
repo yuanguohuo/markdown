@@ -2,7 +2,7 @@
 title: Linux blktrace
 date: 2019-08-28 20:48:12
 tags: [io,blktrace]
-categories: linux 
+categories: tracing
 ---
 
 [iostat](http://www.yuanguohuo.com/2019/08/17/linux-iostat/)可以获取到特定device的IO请求信息，如read/write数，合并数，request size，**等待时间**等。但这些都是基于device统计的，我们无法获取到基于IO的详细信息，特别是**等待时间**都花在哪里了？比如多少时间是在IO scheduler（device的queue）中排队，从发送到device driver到完成又是多少时间。blktrace可以提供这些信息。
