@@ -1,6 +1,6 @@
 ---
 title: 虚拟化入门笔记--Qemu Object Model
-date: 2024-06-12 16:52:08
+date: 2024-07-21 14:52:08
 tags: [virtualization,qemu,kvm]
 categories: kvm
 ---

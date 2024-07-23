@@ -1,6 +1,6 @@
 ---
 title: Linux Ftrace 
-date: 2024-07-18 19:13:21
+date: 2023-07-18 19:13:21
 tags: [kernel, tracing, tracer]
 categories: tracing
 ---

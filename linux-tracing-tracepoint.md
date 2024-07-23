@@ -1,6 +1,6 @@
 ---
 title: Linux Tracepoint
-date: 2024-07-18 18:30:32
+date: 2023-07-18 18:30:32
 tags: [kernel, tracing, event-source]
 categories: tracing
 ---

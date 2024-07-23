@@ -1,6 +1,6 @@
 ---
 title: Linux perf
-date: 2024-07-18 20:47:03
+date: 2023-07-18 20:47:03
 tags: [kernel, tracing, perf]
 categories: tracing
 ---

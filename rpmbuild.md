@@ -1,6 +1,6 @@
 ---
 title: rpmbuild概要 
-date: 2024-03-30 09:46:11
+date: 2024-02-26 09:46:11
 tags: [rpm,rpmbuild,spec]
 categories: rpm
 ---
