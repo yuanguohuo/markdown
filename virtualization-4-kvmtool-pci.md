@@ -81,13 +81,33 @@ PCI Express introduced an extended configuration space, up to 4096 bytes. The on
 
 Configuration space header中有一类重要寄存器叫做BAR: Base Address Register. Type-0 (Non-Bridge) configuration space中有6个BAR。
 
-前面说root complex的时候提到，每个PCI设备(包括bridge和endpoint)都对应一些地址空间，当CPU访问这些地址时root complex就生成transaction requests发给对应设备处理。其中地址空间address region就是由BAR寄存器指定的，一个BAR指定一个address region。所以non-bridge (endpoint)设备至多可以使用6个address region。
+前面说root complex的时候提到，每个PCI设备(包括bridge和endpoint)都对应一些地址空间，当CPU访问这些地址时root complex就生成transaction requests (TLP)发给对应设备处理。其中地址空间叫做BAR region，是由BAR寄存器指定的，即BAR寄存器存储BAR region的base address和size。一个BAR指定一个BAR region。所以non-bridge (endpoint)设备至多可以使用6个BAR region；bridge设备之多可以使用2个BAR region。
 
-BAR还描述address region的大小。在物理机环境下，BIOS或OS探测到region的大小之后(探测方法见下文)，就分配空间，再把空间的base address写入BAR中。注意：在kvmtool中是由kvmtool(VMM: VM Monitor)直接分配的，而不是guest BIOS/OS分配的。
+The CPU can read and write to that BAR region to talk to the PCIe device. When you read or write to offsets within the BAR region, TLP packets are sent back and forth between the CPU/memory and the PCIe device, which tells the PCIe device to do something or send something back.
+
+Such reads and writes are the main way in which drivers interact with PCIe devices. What reads and writes to specific addresses mean is defined by each specific PCIe device and completely device dependant, but typically:
+
+- reads return status information such as:
+    - what the device is currently doing, or how much work it has done so far
+    - how the device has been configured
+- writes:
+    - configure how the device should operate
+    - tell the device to start doing some work, e.g. write to disk, render a frame on the GPU, or send a packet over the network.
+
+A very common pattern in which such operations happen is:
+
+- CPU writes input to RAM;
+- CPU tells the device where the input data is in RAM, and were the output should go to (RAM address or some special memory like Video memory for GPU rendering);
+- device reads input data from main memory via DMA. Again, more TLP packets;
+- device does some work;
+- device writes output data back to main memory via DMA;
+- device sends an interrupt to tell the CPU it finished its work;
+
+BAR寄存器存储BAR region的base address和size。在物理机环境下，BIOS或OS探测到region的大小之后(探测方法见下文)，就分配空间，再把分配的空间的base address写入BAR中。但在kvmtool中BAR region的size是写死的，base address也是是由kvmtool(VMM: VM Monitor)直接分配的，而不是由guest BIOS/OS分配的(这也符合协议吗?)。
 
 若这些地址空间与main memory的地址空间重合，就掩盖了main memory空间(CPU访问不到这些main memory；相当于失去了这块main memory)；也可能和main memory的地址空间不重合。
 
-另外，每个address region可以是memory-mapped，也可以是port-mapped。对于前者，CPU像访问main memory一样使用`mov`这样的指令去读写；对于后者，CPU使用单独的`in`, `out`指令去访问。
+另外，每个BAR region可以是memory-mapped，也可以是port-mapped。对于前者，CPU像访问main memory一样使用`mov`这样的指令去读写；对于后者，CPU使用单独的`in`, `out`指令去访问。
 
 ![figure6](type-1-config-space.png)
 <div style="text-align: center;"><em>图6: Type-1 (Bridge) Configuration Space Header</em></div>
@@ -137,15 +157,33 @@ BIOS/OS遍历各个bus以及bus上的slot；同时顺序分配bus#和device# (�
 
 ## 配置BAR (1.6)
 
-Bus Enumeration之后就知道系统上连接了哪些PCI设备(PCI function)，然后就要对它们进行配置，即使用CAM或者ECAM(见第1.4节)对configuration space的寄存器读写。这里简单说一下对BAR寄存器的配置。前面说过，一个BAR定义一个address region；CPU对这个region的读写被root complex转换成对PCI设备的请求(TLP)。所以配置BAR很重要。
+Bus Enumeration之后就知道系统上连接了哪些PCI设备(PCI function)，然后就要对它们进行配置，即使用CAM或者ECAM(见第1.4节)对configuration space的寄存器读写。这里简单说一下对BAR寄存器的配置。前面说过，一个BAR描述一个BAR region(存储region的base address和size)；CPU对这个region的读写被root complex转换成对PCI设备的读写请求(TLP)。所以配置BAR很重要。
 
-第一个工作就是探测address region的size。规范要求region size必须是2的幂次，并且base address必须对齐到size的整数倍，所以base address的最低`log2(size)`位一定为0。BAR就是存base address的，所以最低N位应该为0(N>=4), region的size就是`2^N`。实际上，最低4位是reserved，前面的`N-4`位为0，这N位都不可写。探测时，先往BAR中写`0xFFFFFFFF`。因为最低N位不可写，所以只有前面`32-N`位被写成`1`。然后读回BAR看后面有多少位不是`1`(reserved最低4位无论是什么值都视为0)，就得到N，也就知道了region的size。
+![figure8](bar-and-region.png)
+<div style="text-align: center;"><em>图8: BAR and Region</em></div>
 
-有了region size，BIOS/OS分配对齐的地址空间，写到BAR。
+第一个工作就是探测BAR region的size。规范要求region size必须是2的幂次，并且base address必须对齐到size的整数倍，所以base address的最低`log2(size)`位一定为0。BAR就是存base address的，所以最低N-bit应该为0(N>=4), region的size就是`2^N`。实际上，最低4-bit是reserved，前面的`N-4`位为0，**这N-bit都不可写**。探测时，先往BAR中写`0xFFFFFFFF`。因为最低N-bit不可写，所以只有前面`32-N`位被写成`1`。然后读回BAR看后面有多少位不是`1`(reserved最低4-bit无论是什么值都视为0)，就得到N，也就知道了region的size。
 
-注意：在上述过程中，假如使用CAM方式，一次寄存器读写都是通过两次IO完成的：先写`PCI_CONFIG_ADDRESS`再读写`PCI_CONFIG_DATA`。
+例如，往一个BAR写入`0xFFFFFFFF`之后再读回，得到`0xFFFFF00X`(X代表reserved的最低4-bit)，就知道BAR region为4K.
 
-在kvmtool中，BAR region空间不是guest BIOS/OS分配的，而是kvmtool分配的(也符合协议吗?)。所以，探测size之前，需要把原来的BAR保存起来；探测完之后再恢复：
+Reserved最低4-bit：
+
+- 0 (Region Type)
+    - 0 = memory-mapped
+    - 1 = IO port-mapped
+- 1-2 (Locatable)
+    - 0 = any 32-bit
+    - 1 = less than 1 MiB
+    - 2 = any 64-bit (即支持BAR region在4G以上的空间中；如何表示64位呢?)
+- 3 (Prefetchable)
+    - 0 = no
+    - 1 = yes
+
+有了BAR region size (以及最低4-bit)，BIOS/OS分配对齐的地址空间，写到BAR。
+
+注意：在上述过程中，假如使用CAM方式，一次寄存器读写都是通过两次IO完成的：先写`PCI_CONFIG_ADDRESS`，再读写`PCI_CONFIG_DATA`。
+
+在kvmtool中BAR region的size是写死的，base address也是是由kvmtool(VMM: VM Monitor)直接分配的，而不是由guest BIOS/OS分配的(这也符合协议吗?)。所以，探测size之前，需要把原来的BAR保存起来；探测完之后再恢复：
 
 - read BAR (保存原值);
 - write 0xFFFFFFFF to BAR;
@@ -153,4 +191,5 @@ Bus Enumeration之后就知道系统上连接了哪些PCI设备(PCI function)，
 - write BAR (恢复原值);
 
 # kvmtool中的PCI (2)
+
 
