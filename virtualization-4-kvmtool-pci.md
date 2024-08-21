@@ -109,6 +109,11 @@ BAR寄存器存储BAR region的base address和size。在物理机环境下，BIO
 
 另外，每个BAR region可以是memory-mapped，也可以是port-mapped。对于前者，CPU像访问main memory一样使用`mov`这样的指令去读写；对于后者，CPU使用单独的`in`, `out`指令去访问。
 
+其他寄存器：
+
+- Status：PCI_STATUS_CAP_LIST(0x10)位表示是否支持Capability List;
+- Cap.Pointer：第一个capability的offset；例如第一个capability紧挨着header(第65字节处)，Cap.Pointer = 65；
+
 ![figure6](type-1-config-space.png)
 <div style="text-align: center;"><em>图6: Type-1 (Bridge) Configuration Space Header</em></div>
 
@@ -190,6 +195,26 @@ Reserved最低4-bit：
 - read BAR;
 - write BAR (恢复原值);
 
+从操作系统的角度看：
+
+![figure9](pci-device-in-view-of-os.png)
+<div style="text-align: center;"><em>图9: 从OS的角度看PCI设备</em></div>
+
+图中PCI设备的BAR regions不一定真实存在(只是OS眼中它们是存在的并且是可读写的)，对它们的读写被翻译成TLP。
+
 # kvmtool中的PCI (2)
 
+对PCI的模拟主要在pci.c和virtio/pci.c两个文件中：
 
+- pci.c：`pci__init`函数是模拟第1.4节所述的CAM (Configuration Access Mechanism)和ECAM (Enhanced Configuration Access Mechanism)。全局只调用一次。
+    - CAM: 注册两个callback函数：`PCI_CONFIG_ADDRESS => pci_config_address_mmio`以及`PCI_CONFIG_DATA => pci_config_data_mmio`。当guest BIOS/OS往`PCI_CONFIG_ADDRESS`写目标寄存器的地址(Bus#, Device#, Function#及configuration space的offset)时，就会触发`pci_config_address_mmio`函数。此函数把Bus#, Device#, Function#及offset保存到全局变量`pci_config_address_bits`中。当guest BIOS/OS读写`PCI_CONFIG_DATA`时，触发`pci_config_data_mmio`。此函数先根据`pci_config_address_bits`找到目标寄存器(特定device的特定function的configuration space的特定offset)，然后读写。Configuration space是内存空间模拟的(每个PCI function在kvmtool内存中都有一个`struct pci_device_header`结构体)，故读写都是`memcpy`，只是方向不同而已。若对应PCI设备(PCI function)不存在，读就返回对应长度的`0xFF`，写则do nothing；
+    - ECAM: 注册一个callback函数：`KVM_PCI_CFG_AREA => pci_config_mmio_access`。这个函数可以一次完成读写一个寄存器的操作。所起的作用和CAM机制相同，不赘述。`KVM_PCI_CFG_AREA(0xD1000000)`的值是如何确定的？On x86 and x64 platforms, ACPI(Advanced Configuration and Power Interface)有一个'MCFG' table, table中有`MMIO_Starting_Physical_Address`，这就是base address of the ECAM region；有了base address，给定PCI function的给定register的address就等于`MMIO_Starting_Physical_Address + ((Bus) << 20 | Device << 15 | Function << 12)`。`KVM_PCI_CFG_AREA`就是`MMIO_Starting_Physical_Address`，对于x86而言，定义在x86/include/kvm/kvm-arch.h中。问题：guest BIOS/OS如何知道这个地址？
+
+- virtio/pci.c：`virtio_pci__init`函数直接构造一个虚拟的PCI设备(PCI function)，故对于每个虚拟PCI设备调用一次。对于每个设备：
+    - 直接分配PCI设备的device#: 从0开始递增，每个PCI设备只有一个function。PCI设备(PCI function)保存在全局列表`device_trees[DEVICE_BUS_PCI]`中。前面说，PCI设备存在或者不存在，就是指能否在这个列表中找到device#匹配的(bus#肯定匹配，因为是拿自己和自己比较，相当于只有一条bus)；
+    - 初始化3个BAR。直接定死每个BAR region的size，且直接分配region base address；IO port-mapped region从0x6200开始以此分配；memory-mapped region从0xD2000000依次分配；
+    - 为每个BAR region注册callback：guest访问到BAR region时，触发对应callback；
+
+# 小结 (3)
+
+回顾PCI在物理机中是如何工作的，明白这个机制之后，模拟工作(kvmtool)也就显而易见了。这为后面学习中断虚拟化、存储虚拟化做准备。
