@@ -72,6 +72,21 @@ The host specifies the destination address of the interrupt message at the MSI-X
 
 On X86 platform, the interrupt message is written to LAPIC (Local component of Advanced Programmable Interrupt Controller), usually integrated into the processor itself. 即前面说的：CPU core内集成的Local-APIC的寄存器，被map到特定memory address. On ARM platform, the interrupt message is written to ARM Generic Interrupt Controller(GIC), GIC's LPI (Locality-specific Peripheral Interrupts) and ITS(Interrupt Translation Service) support MSI-X messages.
 
+## MSI和MSI-X (1.8)
+
+MSI和MSI-X是两个不同的版本，引用维基百科：
+
+- MSI：MSI (first defined in PCI 2.2) permits a device to allocate 1, 2, 4, 8, 16 or 32 interrupts. The device is programmed with an address to write to (this address is generally a control register in an interrupt controller), and a 16-bit data word to identify it. The interrupt number is added to the data word to identify the interrupt. Some platforms such as Windows do not use all 32 interrupts but only use up to 16 interrupts.
+
+- MSI-X：MSI-X (first defined in PCI 3.0) permits a device to allocate up to 2048 interrupts. The single address used by original MSI was found to be restrictive for some architectures. In particular, it made it difficult to target individual interrupts to different processors, which is helpful in some high-speed networking applications. MSI-X allows a larger number of interrupts and gives each one a separate target address and data word. Devices with MSI-X do not necessarily support 2048 interrupts. Optional features in MSI (64-bit addressing and interrupt masking) are also mandatory with MSI-X.
+
+注意一个区别：
+
+- 对于MSI，data是用于identify PCI设备的数字，是系统分配的————系统对PCI设备编程，告诉PCI设备这个数字。PCI设备发中断时，拿data加上interrupt number(应该就是interrupt vector)得到一个新的数字，然后往给定地址上写这个新数字。
+- 对于MSI-X，data是系统分配的，直接对应一个中断；PCI设备发中断时，直接往给定地址写这个数字。这一点在kvmtool实验中可以证实。
+
+下文措辞上不区分MSI和MSI-X，一般说的都是它们共同特征；kvmtool实验上是MSI-X。
+
 # 中断虚拟化 (2)
 
 首先说明，中断虚拟化的工作主要是由kvm内核模块完成的，而不是VMM(kvmtool或qemu)。具体到kvmtool，它的主要工作是构造这么一张表(叫做中断路由表)：
@@ -282,8 +297,6 @@ struct msi_msg {
 
 ## kvmtool的实现 (4.3)
 
-### 启用Capability-List
-
 kvmtool/virtio/pci.c : virtio_pci__init() 每个PCI设备都由本函数初始化：
 
 ```c
@@ -424,10 +437,34 @@ virtio_pci__msix_mmio_callback(...)
 }
 ```
 
-整个过程就是：
+整个过程如图：
 
 ![figure2](build-msi-irq-routing-table.png)
 <div style="text-align: center;"><em>图2: 构造MSI中断路由表</em></div>
 
+看一下中断路由表中的MSI表项：
 
+- address_hi和address_lo就是地址的高32位和低32位；一般情况下32位地址就够用了(所以address_hi为0)，64位地址对于MSI是可选特性，对于MSI-X是必须支持的特性(支持也不一定要使用?)。这个地址映射到某个CPU的Local-APIC的寄存器。
+- data见第1.8节。这里kvmtool实现的应该是MSI-X，所以data是标识中断的，而不是标识PCI设备的(像MSI那样)。因为在触发中断的地方添加打印语句，发现PCI往给定地址上写的就是data本身，而不是data加上interrupt number(像MSI那样)。
 
+最后，看一下guest内的中断触以及PCI设备：
+
+![figure3](interrupt-and-pci-devices.png)
+<div style="text-align: center;"><em>图3: Guest内的PCI设备和中断</em></div>
+
+- virtio0是网卡，使用了3个中断，gsi分别是26, 27, 28；其中26是configure vector；virtio1是存储控制器，也就是虚拟盘，使用了2个中断，gsi分别是24, 25；其中24是configure vector；注意，从代码中上看，每个设备最多可以用33个中断，实际上guest并没有使用这么多。应该是设备的queue数决定使用多少。在哪里配置设备的queue数？
+- 第一个capability (40表示0x40=64?)是MSI-X；
+- Vector table(msix-table)在BAR=2上且偏移是0；PBA也在BAR=2上且偏移是0x210=528(msix-table的大小)；和代码对的上。
+- /proc/interrupts的第一列是MSI号，即System vector number，而不是interrupt vector number;
+- 从图中还可以看到，virtio0(网卡)对应到IRQ 5，virtio1(存储控制器)对应到IRQ 6。一个IRQ再对应多个interrupt vector number?
+
+# kvm内核模块的中断模拟 (5)
+
+如前所述，中断的模拟工作主要是在kvm内核模块中完成的：设备要触发中断，要请求kvm内核模块代劳(见第2节)。在kvm内核模块中，模拟了PIC(级联的8259A)以及APIC的功能，当然也包含MSI方式的中断注入。具体参考下列文章：
+
+https://terenceli.github.io/%E6%8A%80%E6%9C%AF/2018/08/27/kvm-interrupt-emulation
+https://luohao-brian.gitbooks.io/interrupt-virtualization/content/qemu-kvm-zhong-duan-xu-ni-hua-kuang-jia-fen-679028-4e0a29.html
+
+# 小结 (6)
+
+通过本文简单了解了MSI/MSI-X中断方式，也在kvmtool中看到它是如何工作的：1. 系统对PCI设备编程，告诉PCI设备msix-table；2. PCI设备发起中断时，向给定的地址写给定的数据(地址和数据都在msix-table中)。在虚拟环境下，中断的模拟其实不是在VMM(kvmtool)中实现的，而是在kvm内核模块中实现的，所以，PCI设备要发起中断，要请求kvm内核模块来完成。
