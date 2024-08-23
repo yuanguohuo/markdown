@@ -182,51 +182,51 @@ ioctl(kvm->vm_fd, KVM_SIGNAL_MSI, {.address_lo=addr_lo .address_hi=addr_hi, .dat
 ```c
 static int irq__add_routing(u32 gsi, u32 type, u32 irqchip, u32 pin)
 {
-	int r = irq__allocate_routing_entry();
-	if (r)
-		return r;
+    int r = irq__allocate_routing_entry();
+    if (r)
+        return r;
 
-	irq_routing->entries[irq_routing->nr++] =
-		(struct kvm_irq_routing_entry) {
-			.gsi = gsi,
-			.type = type,
-			.u.irqchip.irqchip = irqchip,
-			.u.irqchip.pin = pin,
-		};
+    irq_routing->entries[irq_routing->nr++] =
+        (struct kvm_irq_routing_entry) {
+            .gsi = gsi,
+            .type = type,
+            .u.irqchip.irqchip = irqchip,
+            .u.irqchip.pin = pin,
+        };
 
-	return 0;
+    return 0;
 }
 
 int irq__init(struct kvm *kvm)
 {
-	int i, r;
+    int i, r;
 
-	/* Hook first 8 GSIs to master IRQCHIP */
-	for (i = 0; i < 8; i++)
-		if (i != 2)
-			irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_MASTER, i);
+    /* Hook first 8 GSIs to master IRQCHIP */
+    for (i = 0; i < 8; i++)
+        if (i != 2)
+            irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_MASTER, i);
 
-	/* Hook next 8 GSIs to slave IRQCHIP */
-	for (i = 8; i < 16; i++)
-		irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_SLAVE, i - 8);
+    /* Hook next 8 GSIs to slave IRQCHIP */
+    for (i = 8; i < 16; i++)
+        irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_SLAVE, i - 8);
 
-	/* Last but not least, IOAPIC */
-	for (i = 0; i < 24; i++) {
-		if (i == 0)
-			irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_IOAPIC, 2);
-		else if (i != 2)
-			irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_IOAPIC, i);
-	}
+    /* Last but not least, IOAPIC */
+    for (i = 0; i < 24; i++) {
+        if (i == 0)
+            irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_IOAPIC, 2);
+        else if (i != 2)
+            irq__add_routing(i, KVM_IRQ_ROUTING_IRQCHIP, IRQCHIP_IOAPIC, i);
+    }
 
-	r = ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
-	if (r) {
-		free(irq_routing);
-		return errno;
-	}
+    r = ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+    if (r) {
+        free(irq_routing);
+        return errno;
+    }
 
-	next_gsi = i;
+    next_gsi = i;
 
-	return 0;
+    return 0;
 }
 ```
 
@@ -255,20 +255,20 @@ MSI-Capability的描述结构如下：
 
 ```c
 struct msix_cap {
-	u8 cap;
-	u8 next;
-	u16 ctrl;
+    u8 cap;
+    u8 next;
+    u16 ctrl;
 
     //BAR Indicator register，简称BIR，位于PCIe device的configuration space的capability中(不是header中)；
     //  - 最低3位表示哪个BAR的region用于存table；
     //  - 高29位表示table在BAR-region中的offset;
-	u32 table_offset;
+    u32 table_offset;
 
     //BAR Indicator register，简称BIR，位于PCIe device的configuration space的capability中(不是header中)；
     //  - 最低3位表示哪个BAR的region用于存PBA；
     //  - 高29位表示PBA在BAR-region中的offset;
     //PBA: Pending Bit Array, one bit per vector
-	u32 pba_offset;
+    u32 pba_offset;
 };
 ```
 
@@ -283,9 +283,9 @@ struct msix_cap {
 
 ```c
 struct msi_msg {
-	u32	address_lo;	/* low 32 bits of msi message address */
-	u32	address_hi;	/* high 32 bits of msi message address */
-	u32	data;		/* 16 bits of msi message data */
+    u32    address_lo;    /* low 32 bits of msi message address */
+    u32    address_hi;    /* high 32 bits of msi message address */
+    u32    data;        /* 16 bits of msi message data */
 };
 ```
 
@@ -303,11 +303,11 @@ kvmtool/virtio/pci.c : virtio_pci__init() 每个PCI设备都由本函数初始�
     vpci->pci_hdr = (struct pci_device_header) {
         ...
     
-    	//设置支持Capability List; PCI_STATUS_CAP_LIST=0x10.
-    	.status			= cpu_to_le16(PCI_STATUS_CAP_LIST),
+        //设置支持Capability List; PCI_STATUS_CAP_LIST=0x10.
+        .status            = cpu_to_le16(PCI_STATUS_CAP_LIST),
     
-    	//.capabilities=65. Capability List的头在第65字节处，即第一个capability是msix;
-    	.capabilities		= PCI_CAP_OFF(&vpci->pci_hdr, msix),
+        //.capabilities=65. Capability List的头在第65字节处，即第一个capability是msix;
+        .capabilities        = PCI_CAP_OFF(&vpci->pci_hdr, msix),
     
         ...
     };
@@ -317,43 +317,43 @@ kvmtool/virtio/pci.c : virtio_pci__init() 每个PCI设备都由本函数初始�
 
 ```c
 struct pci_device_header {
-	/* Configuration space, as seen by the guest */
-	union {
-		struct {
-			u16		vendor_id;
-			u16		device_id;
-			u16		command;
-			u16		status;
-			u8		revision_id;
-			u8		class[3];
-			u8		cacheline_size;
-			u8		latency_timer;
-			u8		header_type;
-			u8		bist;
-			u32		bar[6];
-			u32		card_bus;
-			u16		subsys_vendor_id;
-			u16		subsys_id;
-			u32		exp_rom_bar;
-			u8		capabilities;
-			u8		reserved1[3];
-			u32		reserved2;
-			u8		irq_line;
-			u8		irq_pin;
-			u8		min_gnt;
-			u8		max_lat;
+    /* Configuration space, as seen by the guest */
+    union {
+        struct {
+            u16        vendor_id;
+            u16        device_id;
+            u16        command;
+            u16        status;
+            u8        revision_id;
+            u8        class[3];
+            u8        cacheline_size;
+            u8        latency_timer;
+            u8        header_type;
+            u8        bist;
+            u32        bar[6];
+            u32        card_bus;
+            u16        subsys_vendor_id;
+            u16        subsys_id;
+            u32        exp_rom_bar;
+            u8        capabilities;
+            u8        reserved1[3];
+            u32        reserved2;
+            u8        irq_line;
+            u8        irq_pin;
+            u8        min_gnt;
+            u8        max_lat;
 
             //上面一共是64字节，也就是PCI的标准header；下面是扩展区，一般用于存capability list;
             //第一个capability是MSI-X;
-			struct msix_cap msix;
+            struct msix_cap msix;
 
-			/* Used only by architectures which support PCIE */
-			struct pci_exp_cap pci_exp;
-			struct virtio_caps virtio;
-		} __attribute__((packed));
-		/* Pad to PCI config space size */
-		u8	__pad[PCI_DEV_CFG_SIZE];
-	};
+            /* Used only by architectures which support PCIE */
+            struct pci_exp_cap pci_exp;
+            struct virtio_caps virtio;
+        } __attribute__((packed));
+        /* Pad to PCI config space size */
+        u8    __pad[PCI_DEV_CFG_SIZE];
+    };
 
     ...
 };
@@ -362,21 +362,21 @@ struct pci_device_header {
 果然，capability msix就是在第65字节处。看它的初始化：
 
 ```c
-	vpci->pci_hdr.msix.cap = PCI_CAP_ID_MSIX;
+    vpci->pci_hdr.msix.cap = PCI_CAP_ID_MSIX;
 
-    //VIRTIO_NR_MSIX=33(32个virt-queue, 1个configure vector)，所以msix.ctrl = 32，表示32个virt-queue;
-	vpci->pci_hdr.msix.ctrl = cpu_to_le16(VIRTIO_NR_MSIX - 1);
+    //VIRTIO_NR_MSIX=33(32个virt-queue, 1个configure-queue)，所以msix.ctrl = 32，表示32个virt-queue;
+    vpci->pci_hdr.msix.ctrl = cpu_to_le16(VIRTIO_NR_MSIX - 1);
 
 
     //msix.table_offset = 2；
     //   低3位是2:  表示msix-table被map到BAR-2的region；
     //   高29位是0: 表示msix-table在BAR-2 region中的偏移是0；
-	vpci->pci_hdr.msix.table_offset = cpu_to_le32(2);
+    vpci->pci_hdr.msix.table_offset = cpu_to_le32(2);
 
     //msix.pba_offset = 2 | VIRTIO_MSIX_TABLE_SIZE 
     //   低3位是2:  表示PBA被map到BAR-2的region；
     //   高29位是VIRTIO_MSIX_TABLE_SIZE: 表示PBA紧挨着msix-table;
-	vpci->pci_hdr.msix.pba_offset = cpu_to_le32(2 | VIRTIO_MSIX_TABLE_SIZE);
+    vpci->pci_hdr.msix.pba_offset = cpu_to_le32(2 | VIRTIO_MSIX_TABLE_SIZE);
 ```
 
 对于一个给定的PCI设备，guest系统在enumerate到它之后，就会从它的configuration space读到上面的配置。然后在guest眼中，它看到：
@@ -389,13 +389,13 @@ struct pci_device_header {
 
 ```c
 struct virtio_pci {
-	struct pci_device_header pci_hdr;
-	struct device_header	dev_hdr;
+    struct pci_device_header pci_hdr;
+    struct device_header    dev_hdr;
 
     // ...
 
-	u64			        msix_pba;
-	struct msix_table	msix_table[VIRTIO_PCI_MAX_VQ + VIRTIO_PCI_MAX_CONFIG];
+    u64                    msix_pba;
+    struct msix_table    msix_table[VIRTIO_PCI_MAX_VQ + VIRTIO_PCI_MAX_CONFIG];
 
     // ...
 };
@@ -406,41 +406,173 @@ struct virtio_pci {
 ```
 virtio_pci__msix_mmio_callback(...)
 {
-	vecnum = offset / sizeof(struct msix_table);
-	offset = offset % sizeof(struct msix_table);
+    vecnum = offset / sizeof(struct msix_table);
+    offset = offset % sizeof(struct msix_table);
 
-	if (!is_write) {
-		memcpy(data, (void *)&table[vecnum] + offset, len);
-		return;
-	}
+    if (!is_write) {
+        memcpy(data, (void *)&table[vecnum] + offset, len);
+        return;
+    }
 
     //更新msix-table中的给定entry
-	memcpy((void *)&table[vecnum] + offset, data, len);
+    memcpy((void *)&table[vecnum] + offset, data, len);
 
     update_msix_map(...)
     {
+        //这个时候，PCI设备的vector都还没确定: virtio_pci结构体的config_vector, vq_vector[...]都是0xffff(VIRTIO_MSI_NO_VECTOR)
+        //irq__update_msix_route()不会被调用；
+        //所以这时候update_msix_map()函数do nothing，下面这个irq__update_msix_route并不会被调到......后面会看到它的调用；
         irq__update_msix_route(...)
         {
             //更新中断路由表irq_routing的给定entry
-	        entry = &irq_routing->entries[i].u.msi;
-	        changed  = update_data(&entry->address_hi, msg->address_hi);
-	        changed |= update_data(&entry->address_lo, msg->address_lo);
-	        changed |= update_data(&entry->data, msg->data);
+               entry = &irq_routing->entries[i].u.msi;
+               changed  = update_data(&entry->address_hi, msg->address_hi);
+               changed |= update_data(&entry->address_lo, msg->address_lo);
+               changed |= update_data(&entry->data, msg->data);
 
             irq__update_msix_routes()
             {
                 //把更新过的中断路由表告诉kvm内核模块
-	            return ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+                   return ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
             }
         }
     }
 }
 ```
 
-整个过程如图：
+这就模拟了系统(guest)对PCI设备编程：设置msix-table；
 
-![figure2](build-msi-irq-routing-table.png)
-<div style="text-align: center;"><em>图2: 构造MSI中断路由表</em></div>
+![figure2](os-set-pci-dev-msix-table.png)
+<div style="text-align: center;"><em>图2: 系统设置PCI设备的msix-table</em></div>
+
+设置好msix-table之后，系统(guest)为启用的queue配置中断(kvmtool中一个PCI设备最多可以使用32个virt-queue，实际上可以不启用这么多)。配置过程是：
+
+- guest选择一个queue；kvmtool记下被选择的queue号；
+- guest设置被选择的queue的size；没看到实际作用，好多设备实现一个空操作；
+- guest设置被选择的queue的中断；kvmtool为它分配gsi，添加中断路由表项，并告知kvm内核模块；
+- guest启用queue；和vhost相关；
+
+还有一个用于配置的configure-queue，和virt-queue类似，但不用选择，因为它通过一个特殊的操作VIRTIO_PCI_COMMON_MSIX来配置；其他所有virt-queue都通过VIRTIO_PCI_COMMON_Q_MSIX操作来配置，所以事先要选择一个virt-queue。配置完成之后再选择一个来配置。
+
+Guest系统通过write BAR-1的region来完成上述配置；BAR-1对应的callback是`virtio_pci_modern__io_mmio_callback`:
+
+```
+virtio_pci_modern__io_mmio_callback(...)
+{
+    virtio_pci_access(...)
+    {
+        virtio_pci__common_write(...)
+        {
+            switch (offset - VPCI_CFG_COMMON_START) {
+
+                // ...
+
+                //设置configure-queue的中断
+                case VIRTIO_PCI_COMMON_MSIX:
+                    //vec是msix-table中的索引号，例如configure-queue的vec一般为0，表示configure-queue的中断路由信息是msix-table[0]；它在前面已经被设置。
+                    vec = vpci->config_vector = ioport__read16(data);
+
+                    //gsi一般从24开始分配(0-23被irqchip占用)，各个PCI设备，各个queue(包括configure-queue)都不重合
+                    gsi = virtio_pci__add_msix_route(vpci, vec)
+                          {
+                              irq__add_msix_route()
+                              {
+                                  //分配中断路由表的entry；
+                                  irq__allocate_routing_entry();
+
+                                  //分配gsi；即全局变量next_gsi的当前值；每次递增1；
+
+                                  //初始化中断路由表的entry；其实就是把PCI设备msix-table的表项内容拷贝过来；
+                                  //...
+
+
+                                  irq__update_msix_routes()
+                                  {
+                                      return ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+                                  }
+                              }
+                          }
+
+		            if (gsi < 0)
+		            	break;
+
+                    vpci->config_gsi = gsi;
+                    break;
+
+                // case ... 
+
+                //下面4个操作配合起来，设置一个virt-queue的中断；
+
+                //操作1: 锚定一个virt-queue；后面三个操作都是针对这个virt-queue的；
+                case VIRTIO_PCI_COMMON_Q_SELECT:
+                    val = ioport__read16(data);
+                    if (val >= (u32)vdev->ops->get_vq_count(vpci->kvm, vpci->dev))
+                        pr_warning("invalid vq number %u", val);
+                    else
+                        vpci->queue_selector = val;
+                    break;
+
+                //操作2：设置queue size;
+                case VIRTIO_PCI_COMMON_Q_SIZE:
+                    vdev->ops->set_size_vq(vpci->kvm, vpci->dev,
+                                   vpci->queue_selector,
+                                   ioport__read16(data));
+                    break;
+
+                //操作3：设置这个virt-queue的中断；和上面设置configure-queue一样；
+                case VIRTIO_PCI_COMMON_Q_MSIX:
+                    //vec是msix-table中的索引号，例如virt-queue-0的vec一般为1 (configure-queue的是0)，表示virt-queue-0的中断路由信息是msix-table[1]；
+                    vec = vpci->vq_vector[vpci->queue_selector] = ioport__read16(data);
+
+                    //gsi一般从24开始分配(0-23被irqchip占用)，各个PCI设备，各个queue(包括configure-queue)都不重合
+                    gsi = virtio_pci__add_msix_route(vpci, vec);
+                          {
+                              irq__add_msix_route()
+                              {
+                                  //分配中断路由表的entry；
+                                  irq__allocate_routing_entry();
+
+                                  //分配gsi；即全局变量next_gsi的当前值；每次递增1；
+
+                                  //初始化中断路由表的entry；其实就是把PCI设备msix-table的表项内容拷贝过来；
+                                  //...
+
+
+                                  irq__update_msix_routes()
+                                  {
+                                      return ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
+                                  }
+                              }
+                          }
+                    if (gsi < 0)
+                        break;
+
+                    vpci->gsis[vpci->queue_selector] = gsi;
+                    if (vdev->ops->notify_vq_gsi)
+                        vdev->ops->notify_vq_gsi(vpci->kvm, vpci->dev,
+                                     vpci->queue_selector, gsi);
+                    break;
+
+                //操作4：enable/disable这个virt-queue；和vhost相关；
+                case VIRTIO_PCI_COMMON_Q_ENABLE:
+                    val = ioport__read16(data);
+                    if (val)
+                        virtio_pci_init_vq(vpci->kvm, vdev, vpci->queue_selector);
+                    else
+                        virtio_pci_exit_vq(vpci->kvm, vdev, vpci->queue_selector);
+                    break;
+
+                // case ...
+            }
+        }
+    }
+}
+```
+
+过程如图：
+
+![figure3](build-msi-irq-routing-table.png)
+<div style="text-align: center;"><em>图3: 构造MSI中断路由表</em></div>
 
 看一下中断路由表中的MSI表项：
 
@@ -449,10 +581,10 @@ virtio_pci__msix_mmio_callback(...)
 
 最后，看一下guest内的中断触以及PCI设备：
 
-![figure3](interrupt-and-pci-devices.png)
-<div style="text-align: center;"><em>图3: Guest内的PCI设备和中断</em></div>
+![figure4](interrupt-and-pci-devices.png)
+<div style="text-align: center;"><em>图4: Guest内的PCI设备和中断</em></div>
 
-- virtio0是网卡，使用了3个中断，gsi分别是26, 27, 28；其中26是configure vector；virtio1是存储控制器，也就是虚拟盘，使用了2个中断，gsi分别是24, 25；其中24是configure vector；注意，从代码中上看，每个设备最多可以用33个中断，实际上guest并没有使用这么多。应该是设备的queue数决定使用多少。在哪里配置设备的queue数？
+- virtio0是网卡，使用了3个中断，gsi分别是26, 27, 28；其中26是configure-queue；virtio1是存储控制器，也就是虚拟盘，使用了2个中断，gsi分别是24, 25；其中24是configure-queue；注意，从代码中上看，每个设备最多可以用33个中断，实际上guest并没有使用这么多。应该是设备的queue数决定使用多少。在哪里配置设备的queue数？
 - 第一个capability (40表示0x40=64?)是MSI-X；
 - Vector table(msix-table)在BAR=2上且偏移是0；PBA也在BAR=2上且偏移是0x210=528(msix-table的大小)；和代码对的上。
 - /proc/interrupts的第一列是MSI号，即System vector number，而不是interrupt vector number;
