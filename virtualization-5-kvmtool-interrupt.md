@@ -175,7 +175,7 @@ ioctl(kvm->vm_fd, KVM_IRQ_LINE, {.irq=gsi});
 ioctl(kvm->vm_fd, KVM_SIGNAL_MSI, {.address_lo=addr_lo .address_hi=addr_hi, .data=data});
 ```
 
-# 构造IRQCHIP中断路由表 (3)
+# 构建IRQCHIP中断路由表 (3)
 
 这部分非常直接，代码如下，结果就是第2节中断路由表的上半部分。
 
@@ -230,7 +230,7 @@ int irq__init(struct kvm *kvm)
 }
 ```
 
-# 构造MSI中断路由表 (4)
+# 构建MSI中断路由表 (4)
 
 ## PCI的Capability-List (4.1)
 
@@ -275,11 +275,11 @@ struct msix_cap {
 若PCI设备启用了MSI-Capability，它还应该在它的configuration space中做以下设置:
 
 - MSI-Capability在链表中(我们记作msix)，且msix.cap=PCI_CAP_ID_MSIX；
-- msix.ctrl: 设备的virt-queue数；每个virt-queue对应一个gsi. 另外设备的configure功能也占用一个gsi，所以设备最多占msix.ctrl+1个gsi；
+- msix.ctrl: 设备的queue数；每个queue对应一个gsi. 另外设备的configure-queue也占用一个gsi，所以设备最多占msix.ctrl+1个gsi；
 - msix.table_offset：低3位表示msix-table在哪个BAR中(0到5)；高29位表示msix-table在那个BAR-region中的offset；msix-table下面细说；
 - msix.pba_offset：低3位表示PBA(Pending Bit Array)在哪个BAR中(0到5)；高29位表示PBA在那个BAR-region中的offset；
 
-就是说，一个PCI设备可以触发多个中断(gsi不同，对应的IRQ不同，最终的INT也不同)：每个virt-queue一个，外加configure功能一个，共msix.ctrl+1个。前文说，触发MSI中断就是往给定的addr写入给定的data，所以一个PCI设备就有多个addr:data组合。这些addr:data构成一个表，就是msix-table，表项的数量也就是msix.ctrl+1。可想而知，addr:data是系统决定的，而不是PCI设备决定的，所以msix-table应该由系统OS或者BIOS来填写。PCI设备在msix.table_offset中设置的是表的地址(哪个BAR-region的哪个偏移)，且在msix.ctrl中设置了数量；系统读到它们之后，就知道往哪里写msix-table的内容，以及写多少个。表项的结构如下：
+就是说，一个PCI设备可以触发多个中断(gsi不同，对应的IRQ不同，最终的INT也不同)：每个queue一个，外加configure功能一个，共msix.ctrl+1个。前文说，触发MSI中断就是往给定的addr写入给定的data，所以一个PCI设备就有多个addr:data组合。这些addr:data构成一个表，就是msix-table，表项的数量也就是msix.ctrl+1。可想而知，addr:data是系统决定的，而不是PCI设备决定的，所以msix-table应该由系统OS或者BIOS来填写。PCI设备在msix.table_offset中设置的是表的地址(哪个BAR-region的哪个偏移)，且在msix.ctrl中设置了数量；系统读到它们之后，就知道往哪里写msix-table的内容，以及写多少个。表项的结构如下：
 
 ```c
 struct msi_msg {
@@ -296,6 +296,8 @@ struct msi_msg {
 对于真实的PCI设备，系统IO/BIOS和PCI交换配置，完成了MSI-Capability的初始化。对于kvmtool中的虚拟设备，guest IO/BIOS和PCI交换配置，最终生成中断路由表中的条目。
 
 ## kvmtool的实现 (4.3)
+
+### 启用capability msix (4.3.1)
 
 kvmtool/virtio/pci.c : virtio_pci__init() 每个PCI设备都由本函数初始化：
 
@@ -364,7 +366,7 @@ struct pci_device_header {
 ```c
     vpci->pci_hdr.msix.cap = PCI_CAP_ID_MSIX;
 
-    //VIRTIO_NR_MSIX=33(32个virt-queue, 1个configure-queue)，所以msix.ctrl = 32，表示32个virt-queue;
+    //VIRTIO_NR_MSIX=33(32个queue, 1个configure-queue)，所以msix.ctrl = 32，表示32个queue;
     vpci->pci_hdr.msix.ctrl = cpu_to_le16(VIRTIO_NR_MSIX - 1);
 
 
@@ -400,6 +402,8 @@ struct virtio_pci {
     // ...
 };
 ```
+
+### 对PCI设备编程设置PCI设备的msix table (4.3.2)
 
 当guest读写BAR-region(这里特指写msix-table)时就会vmexit，kvm内核模块自己处理不了，就会转交给VMM(这里特指kvmtool)；kvmtool对每个BAR-region注册过不同的callback函数，具体到BAR-2就是`virtio_pci__msix_mmio_callback()`函数。所以guest系统写msix-table，kvmtool就触发`virtio_pci__msix_mmio_callback()`：
 
@@ -445,14 +449,16 @@ virtio_pci__msix_mmio_callback(...)
 ![figure2](os-set-pci-dev-msix-table.png)
 <div style="text-align: center;"><em>图2: 系统设置PCI设备的msix-table</em></div>
 
-设置好msix-table之后，系统(guest)为启用的queue配置中断(kvmtool中一个PCI设备最多可以使用32个virt-queue，实际上可以不启用这么多)。配置过程是：
+### 构建中断路由表并同步给kvm (4.3.3)
 
-- guest选择一个queue；kvmtool记下被选择的queue号；
-- guest设置被选择的queue的size；没看到实际作用，好多设备实现一个空操作；
-- guest设置被选择的queue的中断；kvmtool为它分配gsi，添加中断路由表项，并告知kvm内核模块；
-- guest启用queue；和vhost相关；
+设置好msix-table之后，系统(guest)为queue配置中断。Queue可以分为common-queue和config-queue。Kvmtool中一个PCI设备最多可以使用32个common-queue，实际上可以不启用这么多。配置过程是：
 
-还有一个用于配置的configure-queue，和virt-queue类似，但不用选择，因为它通过一个特殊的操作VIRTIO_PCI_COMMON_MSIX来配置；其他所有virt-queue都通过VIRTIO_PCI_COMMON_Q_MSIX操作来配置，所以事先要选择一个virt-queue。配置完成之后再选择一个来配置。
+- guest选择一个common-queue；kvmtool记下被选择的common-queue号；
+- guest设置被选择的common-queue的size；没看到实际作用，好多设备实现一个空操作；
+- guest设置被选择的common-queue的中断；kvmtool为它分配gsi，添加中断路由表项，并告知kvm内核模块；
+- guest启用被选择的common-queue(包括配置vring地址)；见第4.3.4节；
+
+Configure-queue和common-queue类似，但不用选择，因为它通过一个特殊的操作VIRTIO_PCI_COMMON_MSIX来配置；而所有common-queue都通过VIRTIO_PCI_COMMON_Q_MSIX操作来配置，所以事先要选择一个common-queue。配置好一个之后再选择下一个来配置。
 
 Guest系统通过write BAR-1的region来完成上述配置；BAR-1对应的callback是`virtio_pci_modern__io_mmio_callback`:
 
@@ -488,6 +494,7 @@ virtio_pci_modern__io_mmio_callback(...)
 
                                   irq__update_msix_routes()
                                   {
+                                      //将更新过的中断路由表同步给kvm内核模块
                                       return ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
                                   }
                               }
@@ -501,9 +508,9 @@ virtio_pci_modern__io_mmio_callback(...)
 
                 // case ... 
 
-                //下面4个操作配合起来，设置一个virt-queue的中断；
+                //下面4个操作配合起来，设置一个queue的中断；
 
-                //操作1: 锚定一个virt-queue；后面三个操作都是针对这个virt-queue的；
+                //操作1: 锚定一个queue；后面三个操作都是针对这个queue的；
                 case VIRTIO_PCI_COMMON_Q_SELECT:
                     val = ioport__read16(data);
                     if (val >= (u32)vdev->ops->get_vq_count(vpci->kvm, vpci->dev))
@@ -519,9 +526,9 @@ virtio_pci_modern__io_mmio_callback(...)
                                    ioport__read16(data));
                     break;
 
-                //操作3：设置这个virt-queue的中断；和上面设置configure-queue一样；
+                //操作3：设置被锚定queue的中断；和上面设置configure-queue一样；
                 case VIRTIO_PCI_COMMON_Q_MSIX:
-                    //vec是msix-table中的索引号，例如virt-queue-0的vec一般为1 (configure-queue的是0)，表示virt-queue-0的中断路由信息是msix-table[1]；
+                    //vec是msix-table中的索引号，例如queue-0的vec一般为1 (configure-queue的是0)，表示queue-0的中断路由信息是msix-table[1]；
                     vec = vpci->vq_vector[vpci->queue_selector] = ioport__read16(data);
 
                     //gsi一般从24开始分配(0-23被irqchip占用)，各个PCI设备，各个queue(包括configure-queue)都不重合
@@ -540,6 +547,7 @@ virtio_pci_modern__io_mmio_callback(...)
 
                                   irq__update_msix_routes()
                                   {
+                                      //将更新过的中断路由表同步给kvm内核模块
                                       return ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
                                   }
                               }
@@ -553,7 +561,7 @@ virtio_pci_modern__io_mmio_callback(...)
                                      vpci->queue_selector, gsi);
                     break;
 
-                //操作4：enable/disable这个virt-queue；和vhost相关；
+                //操作4：enable/disable被锚定queue；
                 case VIRTIO_PCI_COMMON_Q_ENABLE:
                     val = ioport__read16(data);
                     if (val)
@@ -584,11 +592,15 @@ virtio_pci_modern__io_mmio_callback(...)
 ![figure4](interrupt-and-pci-devices.png)
 <div style="text-align: center;"><em>图4: Guest内的PCI设备和中断</em></div>
 
-- virtio0是网卡，使用了3个中断，gsi分别是26, 27, 28；其中26是configure-queue；virtio1是存储控制器，也就是虚拟盘，使用了2个中断，gsi分别是24, 25；其中24是configure-queue；注意，从代码中上看，每个设备最多可以用33个中断，实际上guest并没有使用这么多。应该是设备的queue数决定使用多少。在哪里配置设备的queue数？
+- virtio0是网卡，使用了3个中断，gsi分别是26, 27, 28；其中26是configure-queue；virtio1是存储控制器，也就是虚拟盘，使用了2个中断，gsi分别是24, 25；其中24是configure-queue；注意，从代码中上看，每个设备最多可以用33个中断，实际上guest并没有使用这么多。设备定义自己使用多少queue，例如kvmtool中，blk设备写死使用1个queue(加上configure-queue共2个)；
 - 第一个capability (40表示0x40=64?)是MSI-X；
 - Vector table(msix-table)在BAR=2上且偏移是0；PBA也在BAR=2上且偏移是0x210=528(msix-table的大小)；和代码对的上。
 - /proc/interrupts的第一列是MSI号，即System vector number，而不是interrupt vector number;
 - 从图中还可以看到，virtio0(网卡)对应到IRQ 5，virtio1(存储控制器)对应到IRQ 6。一个IRQ再对应多个interrupt vector number?
+
+### guest启用queue (4.3.4)
+
+第4.3.3节留下一个问题：启用被选择的common-queue是什么操作？
 
 # kvm内核模块的中断模拟 (5)
 
