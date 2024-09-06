@@ -161,7 +161,7 @@ ioctl(vm_fd, KVM_SET_GSI_ROUTING, 表的地址);
 - 对于irqchip方式，kvm内核模块模拟芯片(8259A或者IOAPIC)行为，更新芯片的相关寄存器，并唤醒guest vcpu，注入中断；
 - 对于msi方式，kvm内核模块往guest的内存addr写data；内存addr映射的是vcpu的Local-APIC的寄存器；
 
-如何触发中断呢？kvmtool请求kvm触发guest的中断：
+如何触发中断呢？kvmtool请求kvm触发guest的中断(注：在kvmtool中设备向guest发起用signal一词，guest通知设备用notify一词)：
 
 - 对于irqchip方式：
 
@@ -456,7 +456,8 @@ virtio_pci__msix_mmio_callback(...)
 - guest选择一个common-queue；kvmtool记下被选择的common-queue号；
 - guest设置被选择的common-queue的size；没看到实际作用，好多设备实现一个空操作；
 - guest设置被选择的common-queue的中断；kvmtool为它分配gsi，添加中断路由表项，并告知kvm内核模块；
-- guest启用被选择的common-queue(包括配置vring地址)；见第4.3.4节；
+- guest发送被选择的common-queue的vring的地址给device；见[virtio设备](https://www.yuanguohuo.com/2024/08/31/virtualization-6-kvmtool-virtio/)第3节；
+- guest启用被选择的common-queue；见[virtio设备](https://www.yuanguohuo.com/2024/08/31/virtualization-6-kvmtool-virtio/)第4.1.2小节；
 
 Configure-queue和common-queue类似，但不用选择，因为它通过一个特殊的操作VIRTIO_PCI_COMMON_MSIX来配置；而所有common-queue都通过VIRTIO_PCI_COMMON_Q_MSIX操作来配置，所以事先要选择一个common-queue。配置好一个之后再选择下一个来配置。
 
@@ -500,8 +501,8 @@ virtio_pci_modern__io_mmio_callback(...)
                               }
                           }
 
-		            if (gsi < 0)
-		            	break;
+                    if (gsi < 0)
+                        break;
 
                     vpci->config_gsi = gsi;
                     break;
@@ -597,10 +598,6 @@ virtio_pci_modern__io_mmio_callback(...)
 - Vector table(msix-table)在BAR=2上且偏移是0；PBA也在BAR=2上且偏移是0x210=528(msix-table的大小)；和代码对的上。
 - /proc/interrupts的第一列是MSI号，即System vector number，而不是interrupt vector number;
 - 从图中还可以看到，virtio0(网卡)对应到IRQ 5，virtio1(存储控制器)对应到IRQ 6。一个IRQ再对应多个interrupt vector number?
-
-### guest启用queue (4.3.4)
-
-第4.3.3节留下一个问题：启用被选择的common-queue是什么操作？
 
 # kvm内核模块的中断模拟 (5)
 

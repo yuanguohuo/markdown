@@ -215,7 +215,7 @@ Reserved最低4-bit：
     - 初始化3个BAR。直接定死每个BAR region的size，且直接分配region base address；IO port-mapped region从0x6200开始以此分配；memory-mapped region从0xD2000000依次分配；
     - 为每个BAR region注册callback：guest访问到BAR region时，触发对应callback；
 
-PCI/PCIe是一个协议，不同类型的设备都可以通过这个协议来实现，例如网卡、HBA卡(SATA controller或者SAS controller)，只不过它们的操作不同：系统读写BAR region，触发的操作不同。各个设备使用的BAR region数也可以不同。可以把virtio看作一个特殊的PCI设备(当然，virtio也可以通过mmio实现，此乃题外话)，所以它可以实现它独特的操作。例如基于PCI的Capability List机制，virtio设备(起码在kvmtool中)支持：1. virtio通用配置读写；通用配置是指所有virtio设备，virtio-blk, virtio-net, ... 都有的配置，例如配置vring地址和queue的中断；enable/disable queue等；2. 通知设备queue上有available buffer可以处理，即notify-capability；3. isr-capability；4. 设备相关的配置的读写，例如virtio-blk的capacity, cylinder/head/sector数；virtio-net的mac, mtu等。这4类就对应图10中代码中的操作。
+PCI/PCIe是一个协议，不同类型的设备都可以通过这个协议来实现，例如网卡、HBA卡(SATA controller或者SAS controller)，只不过它们的操作不同：系统读写BAR region，触发的操作不同。各个设备使用的BAR region数也可以不同。可以把virtio看作一个特殊的PCI设备(当然，virtio也可以通过mmio实现，此乃题外话)，所以它可以实现它独特的操作。在kvmtool中，virtio设备实现了这4个capability(代码见virtio/pci-modern.c:virtio_pci_modern_init)：1. virtio通用配置读写；通用配置是指所有virtio设备，virtio-blk, virtio-net, ... 都有的配置，例如配置vring地址和queue的中断；enable/disable queue等；2. 通知设备queue上有available buffer可以处理，即notify-capability；3. isr-capability；4. 设备相关的配置的读写，例如virtio-blk的capacity, cylinder/head/sector数；virtio-net的mac, mtu等。这4个capability的实现在设备的configuration space里有反映，guest系统读了设备的configuration space之后，就知道可以使用设备的这些capability，所以就有了图10代码中的4个操作：
 
 ![figure10](virtio-pci-device-in-kvmtool.png)
 <div style="text-align: center;"><em>图10: virtio pci设备</em></div>
