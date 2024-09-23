@@ -364,15 +364,15 @@ int virtio_pci_init_vq(struct kvm *kvm, struct virtio_device *vdev, int vq)
 
 函数`virtio_pci__init_ioeventfd`主要做的事情是：
 
-- 创建一个eventfd；
-- 构造一个`struct kvm_ioeventfd`实例`kvm_ioevent`: {.addr=BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY; .fd=eventfd;}
+- 创建一个eventfd实例，叫做ioeventfd；
+- 构造一个`struct kvm_ioeventfd`实例`kvm_ioevent`: {.addr=BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY; .fd=ioeventfd;}
 - 通过`ioctl(vm_fd, KVM_IOEVENTFD, &kvm_ioevent)`，告诉kvm内核模块；
 
-就是告诉内kvm模块：本该通过写BAR-region(偏移`地址+VIRTIO_PCI_QUEUE_NOTIFY`)发送的通知(第4.1.1节的方式)，现在通过eventfd发。看！它们的地址是相同的：`BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY`！
+就是告诉内kvm模块：本该通过写BAR-region(偏移`地址+VIRTIO_PCI_QUEUE_NOTIFY`)发送的通知(第4.1.1节的方式)，现在通过ioeventfd发。看！它们的地址是相同的：`BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY`！
 
 另外，在kvmtool中BAR-0和BAR-1的功能是相同的(只是一个io-port map另一个memory map)，所以上述过程对BAR-0和BAR-1分别执行一遍。
 
-内核模块kvm如何和guest交互完成这一协定不是文本的内容；总之，**以后的通知会从eventfd上发送过来，谁实现data plane谁就要poll eventfd**；若不使用vhost，也就是VMM(qemu,kvmtool)实现data plane，完全模拟device，那么VMM就poll eventfd，得到通知之后去处理vring中的available-buffer；若使用vhost，则kvmtool不去poll它，交给host内核或者用户态进程的data plane(分别对应vhost和vhost-user模式)；
+内核模块kvm如何和guest交互完成这一协定不是文本的内容；总之，**以后的通知会从ioeventfd上发送过来，谁实现data plane谁就要poll ioeventfd**；若不使用vhost，也就是VMM(qemu,kvmtool)实现data plane，完全模拟device，那么VMM就poll ioeventfd，得到通知之后去处理vring中的available-buffer；若使用vhost，则kvmtool不去poll它，交给host内核或者用户态进程的data plane(分别对应vhost和vhost-user模式)；
 
 ![figure5](actively-poll-notifications.png)
 <div style="text-align: center;"><em>图5: 主动poll通知消息</em></div>
@@ -529,7 +529,7 @@ The virtio specification also allows the notifications to be enabled or disabled
 也就是说，两端都能够使用polling模式：
 
 - virtio-x driver端：guest里不使用内核态virtio-x driver，而是使用SPDK用户态virtio driver； 
-- virtio-x device端：vhost-user；问题：在VMM(kvmtool,qemu)里poll eventfd，如第4.1.2节所示，算是polling模式吗？
+- virtio-x device端：vhost-user；问题：在VMM(kvmtool,qemu)里poll ioeventfd，如第4.1.2节所示，算是polling模式吗？
 
 # 低效问题 (5)
 
