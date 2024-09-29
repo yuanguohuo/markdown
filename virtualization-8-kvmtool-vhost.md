@@ -1,6 +1,6 @@
 ---
 title: 虚拟化入门笔记--kvmtool vhost
-date: 2024-09-06 20:50:33
+date: 2024-10-06 20:50:33
 tags: [virtualization,kvm,kvmtool,vhost]
 categories: kvm
 ---

@@ -25,7 +25,7 @@ MTU(maximum transmission unit)，即最大传输单元，是指一种通信协�
 
 ## Fragmentation的实现 (2.1)
 
-以IPv4为例，虽然它的datagram最大长度是65535字节，但在链路层上传输要受到MTU的限制，所以要进行分片(fragmentation)。有分片当然就有合并：source-host把IPv4-datagram分片、发送，中间路由器接收、合并、再分片、发送，destination-host接收并合并成原始IPv4-datagram。为什么中间路由器要合并再重新分片呢？因为不同跳之间的链路层可能不同，比如某路由器上一跳是FDD，下一跳是以太网。
+以IPv4为例，虽然它的datagram最大长度是65535字节，但在链路层上传输要受到MTU的限制，所以要进行分片(fragmentation)。有分片当然就有合并：source-host把IPv4-datagram分片、发送，中间路由器接收、合并、再分片、发送，destination-host接收并合并成原始IPv4-datagram。为什么中间路由器要合并再重新分片呢？因为不同跳之间的链路层可能不同，比如某路由器上一跳是FDD，下一跳是以太网。要想让整个链路都不分片，见第5节PMTUD。
 
 The IPv4 source, destination, identifier, total length, and fragment offset fields, along with "more fragments" (MF) and "do not fragment" (DF) flags in the IPv4 header, are used for IPv4 fragmentation and reassembly.
 
@@ -49,7 +49,7 @@ The IPv4 source, destination, identifier, total length, and fragment offset fiel
 
 引用[这篇文章](https://www.cisco.com/c/en/us/support/docs/ip/generic-routing-encapsulation-gre/25885-pmtud-ipfrag.html)，fragmentation有很多问题：
 
-- IPv4 fragmentation results in a small increase in CPU and memory overhead to fragment an IPv4 datagram. This is true for the sender and for a router in the path between a sender and a receiver (如第2.1节所说，中间路由器会合并然后再分片).
+- IPv4 fragmentation results in a small increase in CPU and memory overhead to fragment an IPv4 datagram. This is true for the sender and for a router in the path between a sender and a receiver (如第2.1节所说，中间路由器会合并然后再分片，要想让整个链路都不分片，见第5节PMTUD).
 - Fragmentation causes more overhead for the receiver when reassembling the fragments because the receiver must allocate memory for the arriving fragments and coalesce them back into one datagram after all of the fragments are received. Reassembly on a host is not considered a problem because the host has the time and memory resources to devote to this task. Reassembly, however, is inefficient on a router whose primary job is to forward packets as quickly as possible. A router is not designed to hold on to packets for any length of time. A router that does the reassembly chooses the largest buffer available (18K), because it has no way to determine the size of the original IPv4 packet until the last fragment is received.
 - Another fragmentation issue involves how dropped fragments are handled. If one fragment of an IPv4 datagram is dropped, then the entire original IPv4 datagram must be present and it is also fragmented. This is seen with Network File System (NFS). NFS has a read and write block size of 8192. Therefore, a NFS IPv4/UDP datagram is approximately 8500 bytes (which includes NFS, UDP, and IPv4 headers). A sending station connected to an Ethernet (MTU 1500) has to fragment the 8500-byte datagram into six (6) pieces; Five (5) 1500 byte fragments and one (1) 1100 byte fragment. If any of the six fragments are dropped because of a congested link, the complete original datagram has to be retransmitted. This results in six more fragments to be created. If this link drops one in six packets, then the odds are low that any NFS data are transferred over this link, because at least one IPv4 fragment would be dropped from each NFS 8500-byte original IPv4 datagram.
 - Firewalls that filter or manipulate packets based on Layer 4 (L4) through Layer 7 (L7) information have trouble processing IPv4 fragments correctly. If the IPv4 fragments are out of order, a firewall blocks the non-initial fragments because they do not carry the information that match the packet filter. This means that the original IPv4 datagram could not be reassembled by the receiving host. If the firewall is configured to allow non-initial fragments with insufficient information to properly match the filter, a non-initial fragment attack through the firewall is possible.
@@ -63,7 +63,7 @@ The IPv4 source, destination, identifier, total length, and fragment offset fiel
 
 还是引用[这篇文章](https://www.cisco.com/c/en/us/support/docs/ip/generic-routing-encapsulation-gre/25885-pmtud-ipfrag.html)：The Transmission Control Protocol (TCP) Maximum Segment Size (MSS) defines the maximum amount of data that a host accepts in a single TCP/IPv4 datagram. This TCP/IPv4 datagram is possibly fragmented at the IPv4 layer. The sending host is required to limit the size of data in a single TCP segment to a value less than or equal to the MSS reported by the receiving host. Originally, MSS meant how big a buffer (greater than or equal to 65496 bytes) was allocated on a receiving station to be able to store the TCP data contained within a single IPv4 datagram. MSS was the maximum segment of data that the TCP receiver was willing to accept. This TCP segment could be as large as 64K and fragmented at the IPv4 layer in order to be transmitted to the receiving host. The receiving host would reassemble the IPv4 datagram before it handed the complete TCP segment to the TCP layer.
 
-就是说，最初TCP层MSS(Maximum Segment Size)就是定义一个host能够接收的最大TCP包的数据的长度，**不包括TCP头和IP头**，和IP层的fragmentation没有什么关系：即设置了MSS，TCP包**也可能**在网络层进行分片。因为MSS的原意是定义接收方的buffer的大小，即接收方愿意接收的最大TCP包的数据的长度————数据要装在buffer里。所以TCP包可以大到64K，然后在IP层被分片。接收方在IP层合并，然后转给TCP层。如下图所示。
+就是说，最初TCP层MSS(Maximum Segment Size)就是定义一个host能够接收的最大TCP包的数据的长度，**不包括TCP头和IP头，说白了就是TCP的负载的长度**，和IP层的fragmentation没有什么关系：即设置了MSS，TCP包**也可能**在网络层进行分片。因为MSS的原意是定义接收方的buffer的大小，即接收方愿意接收的最大TCP包的数据的长度————数据要装在buffer里。所以TCP包可以大到64K，然后在IP层被分片。接收方在IP层合并，然后转给TCP层。如下图所示。
 
 {% asset_img the-original-tcp-mss.png %}
 
@@ -77,6 +77,8 @@ Host A has a buffer of 16K and Host B a buffer of 8K. They send and receive thei
 - Host A sets its send-mss value to 8K.
 
 ## MSS被用来避免IP层分片 (3.2)
+
+后来，MSS被用来抑制IP层的分片(但它仍然是限制TCP包的负载的长度)。
 
 To assist in avoiding IPv4 fragmentation at the endpoints of the TCP connection, the selection of the MSS value **was changed to** `min(buffer_size, mtu-40)`. MSS numbers are 40 bytes smaller than MTU numbers because MSS (the TCP data size) does not include the 20-byte IPv4 header and the 20-byte TCP header. MSS is based on default header sizes: the sender stack must subtract the appropriate values for the IPv4 header and the TCP header depends on what TCP or IPv4 options are used.
 
@@ -93,7 +95,7 @@ MSS **currently works** in a manner where each host first compares its outgoing 
 
 Fragmentation does not occur at the endpoints of a TCP connection because both outgoing interface MTUs are taken into account by the hosts. Packets still become fragmented in the network between Router A and Router B if they encounter a link with a lower MTU than that of either hosts' outbound interface.
 
-这样以来，**TCP连接的两个端点发送数据时，是保证不会进行IP分片的**，因为选择send-mss时考虑了MTU。**但是中间路由器仍然可能分片**。
+这样以来，**TCP连接的两个端点发送数据时，是保证不会进行IP分片的**，因为选择send-mss时考虑了MTU。**但是中间路由器仍然可能分片**，要想让整个链路都不分片，见第5节PMTUD。
 
 In the example, 1460 is the value chosen by both hosts as the send-mss for each other. Often, **the send-mss value are the same on each end of a TCP connection**.
 
@@ -113,7 +115,7 @@ TCP header的options字段只在SYN=1的时候出现。MSS是其中的一个opti
 
 由于GRE header的长度是24字节，TCP的MSS应该是1460-24=1436。由于终端设备不是总能知道高层协议增加了报文的长度，就像这里的GRE，所以不会自动调整MSS的值。因此，网络设备提供覆盖MSS的选项，例如Cisco的路由器有一个`ip tcp mss-adjust 1436`命令，它会覆盖所以SYN的TCP报文的MSS选项。这样一来，通过该路由器建立的TCP连接的MSS就是1436了。
 
-## MSS协商案例 (3.4)
+## Send-mss的协商案例 (3.4)
 
 第3.2节说过：the send-mss value are the same on each end of a TCP connection. 这也是不绝对的，看下面一个真实的案例：
 
@@ -141,7 +143,7 @@ ss -aieon |grep -A1 {server-addr}:{server-listening-port}
 {% asset_img send-mss-of-client.png %}
 
 - client的send-mss(图中的mss)是1388；TCP握手的时候，server告诉client自己的mss是1400；这个1388应该是来自1400，又减了12(12来自哪里？待确认)；
-- client的rcv-mss(图中的rcvmss)是7948；
+- client的recv-mss(图中的rcvmss)是7948；
 - client的advmss是7948；client端route没有设置advmss，所以这个7948是mtu(8000)减去40，然后又减去一个12(12来自哪里？待确认)；
 
 **从server端看:**
@@ -149,7 +151,7 @@ ss -aieon |grep -A1 {server-addr}:{server-listening-port}
 {% asset_img send-mss-of-server.png %}
 
 - server的send-mss(图中的mss)是7948；TCP握手的时候，server告诉client自己的mss是7960；这个7948应该是来自7960，又减了12(12来自哪里？待确认)；
-- server的rcv-mss(图中的rcvmss)是536；这里为什么选择536作为接收mss呢？
+- server的recv-mss(图中的rcvmss)是536；前面一直专注于send-mss的协商与选择，但这个recv-mss也是个疑问：536是默认MSS，但server在SYN+ACK包中告诉client自己的能够接收的大小是1400(1388)，自己却设置了默认的536；client方的send-mss是1388(以为server能够接收的大小是1388)，它若发来大小为1388的包，server能接收吗？
 - server的advmss是1388；server端route设置了advmss=1400，这里又减去一个12(12来自哪里？待确认)；
 
 所以,整体来讲是符合第3.2节描述的`send-mss`选择流程的(除了减了个12字节):
@@ -221,3 +223,28 @@ generic-segmentation-offload: off [requested on]
 上面关闭了TSO，再抓包，发现每个TCP payload都是1460了：
 
 {% asset_img tso-off.png %}
+
+# PMTUD (5)
+
+设置了MTU和DF(do not fragment)以后，TCP连接的两个端点发送数据时，是保证不会进行IP分片的，**但是中间路由器仍然可能分片**，要想让整个链路都不分片，看PMTUD。
+
+PMTUD was developed in order to avoid fragmentation in the path between the endpoints. It is used to dynamically determine the lowest MTU along the path from a packet source to its destination.
+
+If a router attempts to forward an IPv4 datagram (with the DF bit set) onto a link that has a lower MTU than the size of the packet, the router drops the packet and returns an Internet Control Message Protocol (ICMP) "Destination Unreachable" message to the IPv4 datagram source with the code that indicates "fragmentation needed and DF set" (type 3, code 4).
+
+例子：
+```
+ICMP: dst (10.10.10.10) frag. needed and DF set
+unreachable sent to 10.1.1.1
+```
+
+当一个host发了一个full MSS data packet，但收到了一个ICMP不可达错误"fragmentation needed and DF set"，PMTUD就知道要减小它的send-mss；
+
+# 下一步 (6)
+
+前面留下2个问题：
+
+- TCP握手时，发给对方的MSS分别时7960和1400，但双方选择的send-mss却分别是7948和1388，相差12字节。这12字节来自哪里？
+- 第3.4节中，server端选择的recv-mss是536，为什么？
+
+这2个问题不影响对MSS的理解(可能不同系统的实现不同)，留作下次调查。

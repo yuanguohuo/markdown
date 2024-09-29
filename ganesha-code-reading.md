@@ -75,7 +75,7 @@ categories: nas
     - udp channel  (chan_id=4)
     - tcp channel  (chan_id=3)
     - rdma channel 不存在，因为没有定义宏`_USE_NFS_RDMA`
-    - 一个client端channel (chan_id=2)：作用未知。这里是ganesha server，为什么创建一个client端channel呢？逻辑在函数`clnt_vc_ncreatef`中：
+    - 一个client端channel (chan_id=2)：逻辑在函数`clnt_vc_ncreatef`中。这里是ganesha server，为什么创建一个client端channel呢？猜测是用于server主动call client的情况，暂不深究，简单看一下`clnt_vc_ncreatef`:
         - 使用fd连接raddr：connect(fd, ...)
         - 创建一个SVCXPRT实例包装fd，其xp_dispatch.process_cb = clnt_vc_process;
         - 调用svc_rqst_evchan_reg把SVCXPRT实例添加到channel：此时因为__svc_params->ev_u.evchan.id=0，创建一个新的channel，chan_id=2;
@@ -103,7 +103,7 @@ categories: nas
     - 若有多个事件，除了第一个，其它的都被`work_pool_submit()`提交到线程池，entry函数是`svc_rqst_xprt_task`，即相当于`go svc_rqst_xprt_task()`；也就是说，为后N-1个事件启动异步routine（关于任务和routine的类比，见第1.2节）。
     - 若只有一个事件：是多个事件的特例，next step；
     - 第一个事件被返回前，调用`work_pool_submit()`再提交一个循环poll任务到线程池，entry函数是`svc_rqst_epoll_loop()`，即相当于`go svc_rqst_epoll_loop()`。为什么再起一个循环poll routine呢？因为之前那个将不再干循环poll的活了，见下一步，**偷梁换柱**。
-    - 第一个事件被返回到`svc_rqst_epoll_loop`（之前的循环poll routine），在这里直接调用`svc_rqst_xprt_task`处理它，处理之后就break（循环退出），不再循环poll了。也就是说，之前的循环poll routine poll到N个事件，为后N-1个起了routine异步处理，再起一个新的循环poll routine替代自己（即`go svc_rqst_epoll_loop()`），而自己去处理第一个事件，处理完之后就退出，这就是**偷梁换柱**。
+    - 第一个事件被返回到`svc_rqst_epoll_loop`（之前的循环poll routine），在这里直接调用`svc_rqst_xprt_task`处理它，处理之后就break（循环退出），不再循环poll了。也就是说，之前的循环poll routine poll到N个事件，为后N-1个起了routine异步处理，再起一个新的循环poll routine替代自己（即`go svc_rqst_epoll_loop()`），而自己去处理第一个事件，处理完之后就退出，这就是**偷梁换柱**。看起来好麻烦，有啥作用呢？代码注释中说了：use this hot thread for the first event.
 - 所以，poll到的事件，无论是第一个还是其他的，最终都由`svc_rqst_xprt_task`函数处理，这个函数：
     - 调用SVCXPRT的xp_ops->xp_recv函数；这里是Listening-SVCXPRT，所以函数是`svc_vc_rendezvous`。
 - svc_vc_rendezvous函数调用accept()：返回一个socket，此socket就是和client的连接。然后，创建一个SVCXPRT(包装accept返回的socket)。为了和Listening-SVCXPRT区分，我们把这个SVCXPRT叫做Serving-SVCXPRT。然后调用`svc_vc_override_ops()`来设置Serving-SVCXPRT：
@@ -140,7 +140,7 @@ categories: nas
     - nfs4_Comp(PUTFH,LOOKUP,GETFH,GETATTR); 假如vpc id (vni)不在export的vnis列表，LOOKUP请求会失败，客户端mount会报错: "Operation not permitted".
 - 这些请求的具体语义见后面章节，本节梳理它们的流程处理。
 - server端的循环poll routine(entry函数`svc_rqst_epoll_loop`)在Serving-Chan(epoll实例)poll到事件；
-- 调用svc_rqst_epoll_events()函数。和2.2节调用`svc_rqst_epoll_events`之**偷梁换柱**逻辑一样：起routine异步处理第一个之后的事件；当前负责poll的routine去处理第一个事件，即调用`svc_rqst_xprt_task`：
+- 调用svc_rqst_epoll_events()函数。和2.2节调用`svc_rqst_epoll_events`之**偷梁换柱**逻辑一样：起routine异步处理第一个之后的事件；当前负责poll的routine去处理第一个事件(代码注释说"use this hot thread for the first event")，即调用`svc_rqst_xprt_task`：
     - 调用SVCXPRT的xp_ops->xp_recv函数，这里是Serving-SVCXPRT，所以调用对应的`svc_vc_recv`函数。
 - svc_vc_recv:
     - 调用recv函数从网络接收数据：分为多个fragment；一个fragment也可能recv多次（多次调用svc_vc_recv）;

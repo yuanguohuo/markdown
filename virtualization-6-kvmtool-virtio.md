@@ -5,21 +5,23 @@ tags: [virtualization,kvm,kvmtool,virtio]
 categories: kvm
 ---
 
-本文介绍kvmtool中对virtio的实现。[前文interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)留下一个问题，如何启用virtio device的queue，本文一并回答。
+本文介绍kvmtool中对virtio的实现。[前文interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)留下一个问题，启用virtio device的queue到底做了什么事，本文一并回答。
 
 <!-- more -->
 
 # virtio的组件 (1)
 
-在本文中，我不打算从virtio specification出发去理解virtio，而是直接从kvmtool的代码出发，结合virtio-blk以及virtio-scsi，看virtio是如何工作的。当然，我也会尽可能去概括virtio设备的一般特征。
+在本文中，不打算从virtio specification出发去介绍virtio，而是直接从kvmtool的代码出发，结合virtio-blk以及virtio-scsi，看virtio是如何工作的。当然，我也会尽可能去概括virtio设备的一般特征。
 
-Virtio包括两个组件：guest中的driver和host中的device。VMM(kvmtool,qemu)将virtio device暴露给guest的transport有多种(如PCI, Memory Mapping I/O, S/390 Channel I/O)，PCI是最常见的选择，所以本文特指PCI transport实现的virtio。对于guest来讲，virtio设备就像真PCI设备一样：Real PCI hardware exposes its configuration space using a specific physical memory address range (i.e., the driver can read or write the device’s registers by accessing that memory range) and/or special processor instructions. In the VM world, the VMM (kvmtool,qemu) captures accesses to that memory range and performs device emulation, exposing the same memory layout that a real machine would have and offering the same responses. The virtio specification also defines the layout of its PCI Configuration space, so implementing it is straightforward. 参考[pci virtualization](https://www.yuanguohuo.com/2024/07/22/virtualization-4-kvmtool-pci/).
+Virtio包括两个组件：guest中的driver和host中的device。VMM(kvmtool,qemu)将virtio device暴露给guest的transport有多种(如PCI, Memory Mapping I/O, S/390 Channel I/O)，PCI是最常见的选择，所以本文特指PCI transport实现的virtio。
 
-When the guest boots and uses the PCI/PCIe auto discovering mechanism, the virtio devices identify themselves wit the PCI vendor ID and their PCI Device ID. The guest’s kernel uses these identifiers to know which driver must handle the device。
+对于guest来讲，virtio设备就像真PCI设备一样：Real PCI hardware exposes its configuration space using a specific physical memory address range (i.e., the driver can read or write the device’s registers by accessing that memory range) and/or special processor instructions. In the VM world, the VMM (kvmtool,qemu) captures accesses to that memory range and performs device emulation, exposing the same memory layout that a real PCI device would have and offering the same responses. The virtio specification also defines the layout of its PCI Configuration space, so implementing it is straightforward. 参考[pci virtualization](https://www.yuanguohuo.com/2024/07/22/virtualization-4-kvmtool-pci/).
+
+When the guest boots and uses the PCI/PCIe auto discovering mechanism, the virtio devices identify themselves wit the PCI vendor ID and their PCI Device ID (在PCI设备enumeration时，虚拟设备返回虚拟的vendorID和deviceID). The guest’s kernel uses these identifiers to know which driver must handle the device。
 
 也就是，通过PCI vendorID和deviceID找driver(这和物理设备一样)，只不过vendorID和deviceID是虚拟出来的。我观察到的所有virtio device的vendorID都是0x1af4 (Red Hat, Inc.)；deviceID 0x1003是virtio console, 0x1001是SCSI storage controller等等，可以在[pcilookup网站](https://www.pcilookup.com/)上查询。
 
-因为有各种类型的virtio设备(blk, net, ...)，所以把guest中的server记作**virtio-x driver**，把host中的device记作**virtio-x device**。另外，为了衔接vhost和qemu，这里也把virtio-x device分成control plane和data plane两个部分，control plane和data plane。其实，在kvmtool的实现中这个两部分没有明显的模块化。Control plane指virtio设备的初始化和配置等管理功能，让guest感觉到那里有一个设备。Data plane是设备的真正的数据处理功能，例如virtio-blk设备能够读写，virtio-net设备能够接收和发送数据，让guest真的能使用那个设备的功能。Control plane都是在VMM(kvmtool,qemu)中，而为了提升性能，data plane常被offload到host的内核(vhost)或者host的用户态进程(vhost-user)。这也是我们把virtio-x device强行分成两部分的原因。
+因为有各种类型的virtio设备(blk, net, ...)，所以本文把guest中的driver记作**virtio-x driver**，把host中的device记作**virtio-x device**。另外，为了衔接vhost和qemu，这里也把virtio-x device分成**control plane**和**data plane**两个部分————其实在kvmtool的实现中这个两部分没有明显的模块化。Control plane指virtio设备的初始化和配置等管理功能，让guest感觉到那里有一个设备。Data plane是设备的数据处理功能，例如virtio-blk设备能够存取数据，virtio-net设备能够收发数据包，让guest真的能使用那个设备的功能。Control plane都是在VMM(kvmtool,qemu)中，而为了提升性能，data plane常被offload到host的内核(vhost)或者host的用户态进程(vhost-user)。这也是我们把virtio-x device强行分成两部分的原因。
 
 ![figure1](virtio-components.png)
 <div style="text-align: center;"><em>图1: virtio的组件</em></div>
@@ -67,15 +69,29 @@ Vring传输数据的方式是共享内存(见下一节)。它在两个方向传�
 
 为了高效地完成这个任务，vring设计上分为3个区：Descriptor-Area, Driver-Area (avail-queue), Device-Area (used-queue). Descriptor-Area描述一些内存buffer，逻辑上没有顺序；Driver-Area是virtio-x driver维护的，它通过引用的方式，把Descriptor-Area内的一些buffer组织成queue，也就是available-buffer queue，传递给virtio-x device。类似地，Device-Area是virtio-x device维护的，通过引用的方式，把Descriptor-Area内的一些buffer组织成queue，也就是used-buffer queue，传递给virtio-x driver。[这篇文章](https://www.redhat.com/en/blog/virtqueues-and-virtio-ring-how-data-travels)细讲了数据如何传输。这里仅通过2张图说明。
 
-注意available-buffer中的**available**这个用词，它以guest作为producer，device作为consumer。对于output操作比如符合直觉：available-buffer中存着待输出的数据，输出到device之后，就变成used/consumed；对于input操作有点反直觉：available-buffer是空的，写入数据之后变成used/consumed。
+注意**available/used**这对用词，它的选取视角是guest作producer，device作consumer。对于output操作比如符合直觉：available-buffer中存着待输出的数据，输出到device之后，就变成used/consumed；对于input操作有点反直觉：available-buffer是空的，写入数据之后变成used/consumed。
 
 A buffer can be read-only or write-only from the device point of view, but never both.
 
 ![figure2](pass-available-buffer-to-dev.png)
 <div style="text-align: center;"><em>图2: guest pass available-buffer to virtio device</em></div>
 
+说明：
+- Driver Area是virtio-x driver传递给virtio-x device的available buffer queue；
+- flags的最低位告诉virtio device消费完buffer之后，要不要interrupt guest；不是强制的，只是一个优化；
+- [k, k+1, m]是一个chained buffer，在available ring中只记它的head；
+- idx：队尾的下一个位置。其实就是用来标记队尾。队头就是`struct virt_queue`中的`last_avail_idx`。有了队头和队尾，自然可以判断队列是否位空、并从队列中取出元素。
+
 ![figure3](pass-used-buffer-to-guest.png)
 <div style="text-align: center;"><em>图3: virtio device pass used-buffer to guest </em></div>
+
+说明：
+- Device Area是virtio-x device传递给virtio-x driver的used buffer queue；
+- 对于写操作，一个buffer可能被部分消费(short write)；如图中的buffer j和k；
+- flags的最低位告诉guest的driver，要不要notify设备；不是强制的，只是一个优化；
+- [k, k+1, m] 是一个chained buffer，在used ring中也只记它的head；
+- 设备不修改descriptor area；
+- idx；队尾的下一个位置。其实就是用来标记队尾。
 
 # vring的内存共享 (3)
 
@@ -84,9 +100,9 @@ A buffer can be read-only or write-only from the device point of view, but never
 - 若virtio-x device整个是在VMM中模拟的，则可以直接访问(地址的translation还是必要的，从little-endian转换成host的cpu-endian；little-endian是virtio协议定义的吗？)；
 - 若virtio-x device的data plane被offload，则需要地址映射：like POSIX shared memory; a file descriptor to that memory is shared through vhost protocol；
 
-无论如何，VMM(qemu,kvmtool)需要拿到内存的地址(若offload，VMM再把地址共享给data plane，待确认)。Virtio的common capability可以实现这一点。关于PCI的Capability-List，参考[kvmtool pci](https://www.yuanguohuo.com/2024/07/22/virtualization-4-kvmtool-pci/)。
+无论如何，VMM(qemu,kvmtool)需要拿到内存的地址(若offload，VMM再把地址共享给data plane，待确认)。Virtio的common capability可以实现这一点，[interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)的第4.3.3节提到**guest发送被选择的common-queue的vring的地址给device**，就是这个实现。
 
-前一篇[interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)的第4.3.3节提到**guest发送被选择的common-queue的vring的地址给device**，就是现在说的这个事。首先，kvmtool实现了common capability(见virtio/pci-modern.c:virtio_pci_modern_init函数)：
+Kvmtool方面：实现了common capability，即在configuration space中填写了virtio common capability的相关配置(见virtio/pci-modern.c:virtio_pci_modern_init函数)。
 
 ```c
 int virtio_pci_modern_init(struct virtio_device *vdev)
@@ -120,7 +136,9 @@ int virtio_pci_modern_init(struct virtio_device *vdev)
 }
 ```
 
-Guest从device的configuration space读到这个配置，知道device启用了这个capability，就写对应的BAR-region (偏移`VPCI_CFG_COMMON_START`处)，传递过来vring各个area的地址。在kvmtool中，BAR-0和BAR-1的region都支持这个操作，它们注册的callback都是`virtio_pci_modern__io_mmio_callback`，只是io-port map和memory map的不同。
+Guest方面：从device的configuration space读到这个配置，知道device启用了virtio common capability，就写对应的BAR-region (偏移`VPCI_CFG_COMMON_START`处)，传递过来vring的各个area的地址。
+
+在kvmtool中，BAR-0和BAR-1的region都支持这个操作，它们注册的callback都是`virtio_pci_modern__io_mmio_callback`，只是io-port map和memory map的不同。
 
 ```c
 void virtio_pci_modern__io_mmio_callback(struct kvm_cpu *vcpu, u64 addr,
@@ -204,11 +222,13 @@ static bool virtio_pci__common_write(struct virtio_device *vdev,
 
 In the PCI case, the guest sends the available-buffer notification by writing to a specific memory address, and the device uses a vCPU interrupt to send the used buffer notification.
 
+注：引入vhost之后，data plane主动poll vring，不需要available-buffer notification。而guest中的virtio-x driver，若是内核态的，应该还依赖used-buffer notification；若guest中采用用户态driver(如SPDK的用户态nvme driver)，就不依赖了。
+
 名词约定：在kvmtool的代码中，available-buffer notification用的是**notify**一词；而used-buffer notification用的是**signal**一词(即interrupt)。
 
 ## Available-buffer notification (4.1)
 
-The guest (virtio-x driver) sends the available buffer notification by writing to a specific memory address. 这是virtio的notify capability。和前面说的common capability一样，virtio/pci-modern.c:virtio_pci_modern_init函数中也启用了notify capability:
+The guest (virtio-x driver) sends the available buffer notification by writing to a specific memory address. 这是virtio的notify capability(和前面的common capability并列)，启用过程在virtio/pci-modern.c:virtio_pci_modern_init中:
 
 ```c
 int virtio_pci_modern_init(struct virtio_device *vdev)
@@ -247,9 +267,9 @@ int virtio_pci_modern_init(struct virtio_device *vdev)
 
 Guest从device的configuration space读到这个配置，知道device启用了notify capability，就写对应的BAR-region (偏移`VPCI_CFG_NOTIFY_START`处)，实现通知功能。在kvmtool中，BAR-0和BAR-1的region都支持这个操作，它们注册的callback都是`virtio_pci_modern__io_mmio_callback`，只是io-port map和memory map的不同。
 
-### 被动接收通知消息 (4.1.1)
+### 同步通知 (4.1.1)
 
-如果不主动poll通知消息(见4.1.2节)的话，virtio-x driver写BAR-region-0或者BAR-region-1(偏移`VPCI_CFG_NOTIFY_START`)时，就触发`virtio_pci_modern__io_mmio_callback`函数：
+Virtio-x driver通过写BAR-region-0或者BAR-region-1(偏移`VPCI_CFG_NOTIFY_START`)通知device有available buffer可以处理。这时就触发kvmtool的`virtio_pci_modern__io_mmio_callback`函数，VM阻塞，所以通知是同步的。
 
 ```c
 void virtio_pci_modern__io_mmio_callback(struct kvm_cpu *vcpu, u64 addr,
@@ -302,12 +322,14 @@ static bool virtio_pci__notify_write(struct virtio_device *vdev,
 
 通知消息中只包含virt queue number；因为buffer在vring中，这里只要告诉device vring里有数据就行了。
 
-![figure4](passively-recv-notifications.png)
-<div style="text-align: center;"><em>图4: 被动接收通知消息</em></div>
+![figure4](synchronouse-notification.png)
+<div style="text-align: center;"><em>图4: 同步通知</em></div>
 
-### 主动poll通知消息 (4.1.2)
+### 异步通知 (4.1.2)
 
-主动poll通知消息具有更高的优先级，假如启用的话，4.1.1节中的方式就接收不到消息(我在kvmtool上实验过)。如何启用呢？这刚好填了前一篇[interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)中第4.3.3节留下的坑：启用被选择的common-queue。Guest选择一个common-queue，配置中断，共享vring地址(前面第3节)之后就启用它，触发如下callback：
+Virtio-x driver把通知写到ioeventfd中，然后继续工作。通知消息可以缓存在ioeventfd中；virtio-x device异步地poll ioeventfd (注意和vhost poll vring不同)，批量地处理(batch)。
+
+异步有更高的优先级，假如启用的话，同步方式就接收不到消息(我在kvmtool上实验过)。如何启用呢？这刚好填了前一篇[interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)中第4.3.3节留下的坑：启用被选择的common-queue。Guest选择一个common-queue，配置中断，共享vring地址(前面第3节)之后就启用它，触发如下callback：
 
 ```c
 static bool virtio_pci__common_write(struct virtio_device *vdev,
@@ -337,7 +359,7 @@ static bool virtio_pci__common_write(struct virtio_device *vdev,
 }
 ```
 
-我们只看启用`virtio_pci_init_vq`：启用queue的主要任务是`vdev->ops->init_vq`，让device处理vring上的buffer。但我们本小节的重点是`virtio_pci__init_ioeventfd`，它的任务是启用主动poll机制。如注释中所述，把它删掉也不影响功能，使用被动接收方式而已。
+我们只看启用`virtio_pci_init_vq`：启用queue的主要任务是`vdev->ops->init_vq`，让device处理vring上的buffer。重点是`virtio_pci__init_ioeventfd`，它的任务是启用异步通知机制。如注释中所述，把它删掉也不影响功能，只是会使用同步通知方式而已。
 
 ```c
 int virtio_pci_init_vq(struct kvm *kvm, struct virtio_device *vdev, int vq)
@@ -346,7 +368,7 @@ int virtio_pci_init_vq(struct kvm *kvm, struct virtio_device *vdev, int vq)
     struct virtio_pci *vpci = vdev->virtio;
 
     //也可以跳过对virtio_pci__init_ioeventfd()的调用；
-    //假如跳过，notification就会通过这个方式发送过来(就是4.1.1节中的被动接收通知消息)：
+    //假如跳过，notification就会通过这个方式发送过来(就是4.1.1节中的同步通知方式)：
     //      virtio_pci_modern__io_mmio_callback() -->
     //      virtio_pci_access()
     //      {
@@ -368,14 +390,14 @@ int virtio_pci_init_vq(struct kvm *kvm, struct virtio_device *vdev, int vq)
 - 构造一个`struct kvm_ioeventfd`实例`kvm_ioevent`: {.addr=BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY; .fd=ioeventfd;}
 - 通过`ioctl(vm_fd, KVM_IOEVENTFD, &kvm_ioevent)`，告诉kvm内核模块；
 
-就是告诉内kvm模块：本该通过写BAR-region(偏移`地址+VIRTIO_PCI_QUEUE_NOTIFY`)发送的通知(第4.1.1节的方式)，现在通过ioeventfd发。看！它们的地址是相同的：`BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY`！
+就是告诉内kvm模块：本该通过写BAR-region(偏移`地址+VIRTIO_PCI_QUEUE_NOTIFY`)发送的通知(第4.1.1节的方式)，现在通过ioeventfd发(可以被缓存，然后批量地处理)。看！它们的地址是相同的：`BAR-region起始地址+VIRTIO_PCI_QUEUE_NOTIFY`！
 
 另外，在kvmtool中BAR-0和BAR-1的功能是相同的(只是一个io-port map另一个memory map)，所以上述过程对BAR-0和BAR-1分别执行一遍。
 
-内核模块kvm如何和guest交互完成这一协定不是文本的内容；总之，**以后的通知会从ioeventfd上发送过来，谁实现data plane谁就要poll ioeventfd**；若不使用vhost，也就是VMM(qemu,kvmtool)实现data plane，完全模拟device，那么VMM就poll ioeventfd，得到通知之后去处理vring中的available-buffer；若使用vhost，则kvmtool不去poll它，交给host内核或者用户态进程的data plane(分别对应vhost和vhost-user模式)；
+![figure5](asynchronouse-notification.png)
+<div style="text-align: center;"><em>图5: 异步通知</em></div>
 
-![figure5](actively-poll-notifications.png)
-<div style="text-align: center;"><em>图5: 主动poll通知消息</em></div>
+注意：异步通知可以实现批处理，性能应该比同步通知更高；虽然它也是通过poll实现的，但和vhost poll vring不同，后者不需要通知，更高效。
 
 ## Used-buffer notification (4.2)
 
@@ -395,7 +417,7 @@ ioctl(kvm->vm_fd, KVM_IRQ_LINE, {.irq=gsi});
 ioctl(kvm->vm_fd, KVM_SIGNAL_MSI, {.address_lo=addr_lo .address_hi=addr_hi, .data=data});
 ```
 
-以virtio-blk为例，应该是在处理完请求之后，发起中断。
+以virtio-blk为例，在处理完请求之后，发起中断。
 
 ```c
 static void virtio_blk_do_io(struct kvm *kvm, struct virt_queue *vq, struct blk_dev *bdev)
@@ -524,23 +546,23 @@ static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci,
 }
 ```
 
-The virtio specification also allows the notifications to be enabled or disabled dynamically. That way, devices and drivers can batch buffer notifications or even actively poll for new buffers in virtqueues (busy polling). This approach is better suited for high traffic rates. 
+The virtio specification also allows the notifications to be enabled or disabled dynamically. That way, devices and drivers can batch buffer notifications (异步通知) or even actively poll for new buffers in virtqueues (busy polling, vhost). This approach is better suited for high traffic rates.
 
 也就是说，两端都能够使用polling模式：
 
-- virtio-x driver端：guest里不使用内核态virtio-x driver，而是使用SPDK用户态virtio driver； 
-- virtio-x device端：vhost-user；问题：在VMM(kvmtool,qemu)里poll ioeventfd，如第4.1.2节所示，算是polling模式吗？
+- virtio-x driver端：guest里不使用内核态virtio-x driver，而是使用用户态driver，例如SPDK的用户态nvme driver；
+- virtio-x device端：vhost；注意vhost poll vring和poll ioeventfd不同；
 
 # 低效问题 (5)
 
 从前面图1,4,5可见，data plane在VMM(kvmtool,qemu)中，即用户态进程中，这带来一些效率问题：
 
-- virtio-x driver发完available-buffer notification，vCPU停止运行，转到VMM(kvmtool,qemu)用户态进程。这有个内核态到用户态的context switch；
+- virtio-x driver发完available-buffer notification，vCPU停止运行，转到VMM(kvmtool,qemu)用户态进程(异步通知模式应该不会)。这有个内核态到用户态的context switch；
 - 通常情况下，VMM(virtio-x device)还是要借助host kernel的能力来处理数据，这就有用户态到内核态的数据拷贝。例如，VMM中的虚拟网卡要把数据拷贝到host内核态的tap；VMM中的blk要把数据拷贝到内核态驱动。
-- VMM(virtio-x device)给virtio-x driver发中断，要使用ioctl，它是一个系统调用，所以有个用户态到内核态再返回用户态的context switch；
+- VMM(virtio-x device)给virtio-x driver发中断，要使用ioctl，它是一个系统调用，所以有用户态到内核态再返回用户态的context switch；
 - 因为vCPU停止运行了，还需要一个系统调用来resume vCPU，也是有用户态到内核态再返回用户态的context switch；
 
-这所有的低效都因为data plane在VMM中。假如data plane在host的内核中，那么context switch就没有了，并且也不存在用户态到内核态的数据拷贝问题：通过一些内存映射，vring中的buffer可以直接共享给内核里的data plane。这就是下一章vhost的内容。
+这所有的低效都因为data plane在VMM中。假如data plane在host的内核中，那么context switch就没有了，并且也不存在用户态到内核态的数据拷贝问题：通过一些内存映射，vring中的buffer可以直接共享给内核里的data plane。这就是[vhost](https://www.yuanguohuo.com/2024/10/06/virtualization-8-kvmtool-vhost/)的内容。
 
 # 小结 (6)
 

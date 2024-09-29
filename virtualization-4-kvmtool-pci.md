@@ -17,14 +17,14 @@ Kvmtool可以认为是一个极简版的qemu (所处软件层、功能都和qemu
 <div style="text-align: center;"><em>图1: PCI 拓扑</em></div>
 
 - A tree structure of interconnected I/O buses is supported through a series of PCI bus bridges.
-- Every PCI device has a unique vendor ID and device ID.
+- Every PCI device has a unique VendorID and DeviceID. The VendorID-DeviceID combination designates which driver the host should load in order to handle the device.
 - Multiple devices of the same kind are further identified by their unique device numbers on the bus where they reside.
 - Each PCI peripheral is identified by a bus number, a device number, and a function number. The PCI specification permits a single system to host up to 256 buses, but because 256 buses are not sufficient for many large systems, Linux now supports PCI domains. Each PCI domain can host up to 256 buses. Each bus hosts up to 32 devices, and each device can be a multifunction board (with a maximum of eight functions), such as an audio device with an accompanying CD-ROM drive (这可能是function一词的由来), a single PCI network card could have two logically separate NICs (这里2个function相同).  Therefore, each function can be identified at hardware level by a 16-bit address, or key. 
     - domain   : 16-bit，一般为0，好多地方都省略，起码我见过的服务器上全是0000
     - bus      : 8-bit
     - device   : 5-bit
     - function : 3-bit
-- 对操作系统来说，function就是独立的PCI硬件设备，由domain:bus:device.function唯一定位。可以理解为一张物理卡上包含多个逻辑PCI设备。
+- 对操作系统来说，function就是独立的PCI硬件设备，由domain:bus:device.function唯一定位。可以理解为一张物理卡(设备)上包含多个PCI设备。后文说一个PCI设备多数是指一个function。
 - Typical PCI devices:
     - Bridges: Host/North Bridge (class=0x060000), PCI-to-PCI bridge (class=0x060400)
     - HBA: SATA controller (class=0x010601), SAS controller (class=0x010700) 
@@ -53,8 +53,9 @@ PCI device是通过switch连到root complex的，所以switch内部各个port到
 从这个图可以看出:
 
 - root complex和switch的内部结构一样：也是internel bus和PCI-to-PCI bridge的组合；
-- 只不过**upstream bridge就是host bridge (north bridge)**；
-另外，摘自维基百科：
+- 只不过**upstream bridge就是host bridge** (north bridge)；
+
+摘自维基百科：
 
 Similar to a host bridge in a PCI system, the root complex generates transaction requests on behalf of the CPU, which is interconnected through a local bus. Root complex functionality may be integrated in the chipset and/or the CPU. A root complex may contain more than one PCI Express port and multiple switch devices can be connected to ports on the root complex or cascaded.
 
@@ -79,11 +80,11 @@ Configuration space header是64字节；PCI设备有192字节的额外空间，�
 
 PCI Express introduced an extended configuration space, up to 4096 bytes. The only standardized part of extended configuration space is the first four bytes at 0x100 which are the start of an extended capability list. 也就是说前256字节和PCI一样。从第256字节(0x100)开始的4字节是标准化的，后面的部分(4096-256-4=3836B)都是扩展的。
 
-Configuration space header中有一类重要寄存器叫做BAR: Base Address Register. Type-0 (Non-Bridge) configuration space中有6个BAR。
+Configuration space header中有一类重要寄存器叫做BAR: Base Address Register. Type-0 (Non-Bridge) configuration space中有6个BAR; Type-1 (Bridge) configuration space中有2个BAR.
 
-前面说root complex的时候提到，每个PCI设备(包括bridge和endpoint)都对应一些地址空间，当CPU访问这些地址时root complex就生成transaction requests (TLP)发给对应设备处理。其中地址空间叫做BAR region，是由BAR寄存器指定的，即BAR寄存器存储BAR region的base address和size。一个BAR指定一个BAR region。所以non-bridge (endpoint)设备至多可以使用6个BAR region；bridge设备之多可以使用2个BAR region。
+前面说root complex的时候提到，每个PCI设备(包括bridge和endpoint)都对应一些地址空间，当CPU访问这些地址时root complex就生成transaction requests (TLP)发给对应设备处理。其中地址空间叫做BAR region，是由BAR寄存器指定的，即BAR寄存器存储BAR region的base address和size。一个BAR指定一个BAR region。所以non-bridge (endpoint)设备至多可以使用6个BAR region；bridge设备至多可以使用2个BAR region。
 
-The CPU can read and write to that BAR region to talk to the PCIe device. When you read or write to offsets within the BAR region, TLP packets are sent back and forth between the CPU/memory and the PCIe device, which tells the PCIe device to do something or send something back.
+**The CPU can read and write to that BAR region to talk to the PCIe device. When you read or write to offsets within the BAR region, TLP packets are sent back and forth between the CPU/memory and the PCIe device, which tells the PCIe device to do something or send something back.**
 
 Such reads and writes are the main way in which drivers interact with PCIe devices. What reads and writes to specific addresses mean is defined by each specific PCIe device and completely device dependant, but typically:
 
@@ -97,7 +98,7 @@ Such reads and writes are the main way in which drivers interact with PCIe devic
 A very common pattern in which such operations happen is:
 
 - CPU writes input to RAM;
-- CPU tells the device where the input data is in RAM, and were the output should go to (RAM address or some special memory like Video memory for GPU rendering);
+- CPU tells the device where the input data is in RAM, and where the output should go to (RAM address or some special memory like Video memory for GPU rendering);
 - device reads input data from main memory via DMA. Again, more TLP packets;
 - device does some work;
 - device writes output data back to main memory via DMA;
@@ -156,18 +157,18 @@ BIOS/OS遍历各个bus以及bus上的slot；同时顺序分配bus#和device# (�
 
 若slot上没有设备，读到将是0xFFFFFFFF(非法VendorID/DeviceID)，继续下一个slot ... 若slot上有设备(设备必须有function0，PCI规范要求的)，它就会响应，返回自己的VendorID/DeviceID，表示扫描到一个PCI设备，这个PCI设备也就被分配到busX:deviceY；它若有多个function, function#分别是0, 1, 2, ... 它也可能是一个PCI-to-PCI bridge，这样就产生一个新的bus，再对新bus进行enumerate ...
 
-这里有一个问题：slot上的设备如何决定自己要不要响应呢？这时设备还不知道自己将要分配到busX:deviceY。这不是"鸡生蛋-蛋生鸡"的问题吗？答：这是硬件实现的。设备决定是否响应，不是看busX:deviceY是否指向自己，而是靠物理信号Initialization Device Select (IDSEL)。应该是此时硬件保证只有这个slot的IDSEL被点亮。事实上，设备只解析0-10bit，看目标是哪个function的哪个register，根本不会解析bus#和device#，更不会依靠bus#和device#判断是否是给自己的请求。不止Bus enumeration时，以后任何对configuration space register的访问，设备都不是看bus#:device#是否指向自己，都是靠IDSEL信号。
+这里有一个问题：slot上的设备如何决定自己要不要响应呢？这时设备还没有分配bus#和devcie#，当然更不知道自己是不是busX:deviceY。这不是"鸡生蛋-蛋生鸡"的问题吗？答：这是硬件实现的。设备决定是否响应，不是看busX:deviceY是否指向自己，而是靠物理信号Initialization Device Select (IDSEL)。应该是此时硬件保证只有这个slot的IDSEL被点亮。被点亮的设备只解析0-10bit，看目标是哪个function的哪个register，根本不会解析bus#和device#，更不会依靠bus#和device#判断是否是给自己的请求。不止Bus enumeration时，以后任何对configuration space register的访问，设备都不是看bus#:device#是否指向自己，都是靠IDSEL信号。
 
-但是在kvmtool中，确实是靠bus#:device#来判断如何响应guest BIOS/OS的，并且只模拟了一条bus，所以只靠device#判断：模拟PCI设备时，直接给它分配了device#；guest BIOS/OS进行bus enumeration时，判断device#是否存在，决定是回复对应设备的VendorID/DeviceID还是0xFFFFFFFF。
+但是在kvmtool虚拟环境中，确实是靠bus#:device#来判断如何响应guest BIOS/OS的。并且，kvmtool只模拟了一条bus，所以只靠device#判断：模拟PCI设备时，直接给它分配了device#；guest BIOS/OS进行bus enumeration时，kvmtool查看device#是否存在，决定是回复对应设备的VendorID/DeviceID还是0xFFFFFFFF。
 
 ## 配置BAR (1.6)
 
-Bus Enumeration之后就知道系统上连接了哪些PCI设备(PCI function)，然后就要对它们进行配置，即使用CAM或者ECAM(见第1.4节)对configuration space的寄存器读写。这里简单说一下对BAR寄存器的配置。前面说过，一个BAR描述一个BAR region(存储region的base address和size)；CPU对这个region的读写被root complex转换成对PCI设备的读写请求(TLP)。所以配置BAR很重要。
+Bus Enumeration之后就知道系统上连接了哪些PCI设备(PCI function)，然后就要对它们进行配置，即使用CAM或者ECAM(见第1.4节)对configuration space的寄存器进行读写。这里简单说一下对BAR寄存器的配置。前面说过，一个BAR描述一个BAR region(存储region的base address和size)；CPU对这个region的读写被root complex转换成对PCI设备的读写请求(TLP)。所以配置BAR很重要。
 
 ![figure8](bar-and-region.png)
 <div style="text-align: center;"><em>图8: BAR and Region</em></div>
 
-第一个工作就是探测BAR region的size。规范要求region size必须是2的幂次，并且base address必须对齐到size的整数倍，所以base address的最低`log2(size)`位一定为0。BAR就是存base address的，所以最低N-bit应该为0(N>=4), region的size就是`2^N`。实际上，最低4-bit是reserved，前面的`N-4`位为0，**这N-bit都不可写**。探测时，先往BAR中写`0xFFFFFFFF`。因为最低N-bit不可写，所以只有前面`32-N`位被写成`1`。然后读回BAR看后面有多少位不是`1`(reserved最低4-bit无论是什么值都视为0)，就得到N，也就知道了region的size。
+第一个工作就是探测BAR region的size。规范要求region size最小16B，最大2MiB，且必须为2的幂次；另外，base address必须对齐到size的整数倍。所以若region size是`2^N`，那么base address的最低`N`位一定为0(`N>=4`)。BAR寄存器就是存base address的，所以最低`N`位一定为0。既然一定为0，硬件上就设计为**不可写**。探测时，先往BAR中写`0xFFFFFFFF`。因为最低`N`位不可写，所以只有前面`32-N`位被写成`1`。这时读回BAR，假设是`1...10...0000`(二进制)，看末尾有多少位`0`，就得到`N`，也就得到了region size。实现中，最低4位是reserved，但这不影响探测逻辑：读回的BAR是`1...10...xxxx`(二进制)，把最低4位看作`0`就可以了。
 
 例如，往一个BAR写入`0xFFFFFFFF`之后再读回，得到`0xFFFFF00X`(X代表reserved的最低4-bit)，就知道BAR region为4K.
 
@@ -211,16 +212,23 @@ Reserved最低4-bit：
     - ECAM: 注册一个callback函数：`KVM_PCI_CFG_AREA => pci_config_mmio_access`。这个函数可以一次完成读写一个寄存器的操作。所起的作用和CAM机制相同，不赘述。`KVM_PCI_CFG_AREA(0xD1000000)`的值是如何确定的？On x86 and x64 platforms, ACPI(Advanced Configuration and Power Interface)有一个'MCFG' table, table中有`MMIO_Starting_Physical_Address`，这就是base address of the ECAM region；有了base address，给定PCI function的给定register的address就等于`MMIO_Starting_Physical_Address + ((Bus) << 20 | Device << 15 | Function << 12)`。`KVM_PCI_CFG_AREA`就是`MMIO_Starting_Physical_Address`，对于x86而言，定义在x86/include/kvm/kvm-arch.h中。问题：guest BIOS/OS如何知道这个地址？
 
 - virtio/pci.c：`virtio_pci__init`函数直接构造一个虚拟的PCI设备(PCI function)，故对于每个虚拟PCI设备调用一次。对于每个设备：
-    - 直接分配PCI设备的device#: 从0开始递增，每个PCI设备只有一个function。PCI设备(PCI function)保存在全局列表`device_trees[DEVICE_BUS_PCI]`中。前面说，PCI设备存在或者不存在，就是指能否在这个列表中找到device#匹配的(bus#肯定匹配，因为是拿自己和自己比较，相当于只有一条bus)；
+    - 直接分配PCI设备的device#: 从0开始递增。并且为了简单，kvmtool模拟的每个PCI设备只有一个function。PCI设备(PCI function)保存在全局列表`device_trees[DEVICE_BUS_PCI]`中。前面说，PCI设备存在或者不存在，就是指能否在这个列表中找到device#匹配的(bus#肯定匹配，因为是拿自己和自己比较，相当于只有一条bus)；
     - 初始化3个BAR。直接定死每个BAR region的size，且直接分配region base address；IO port-mapped region从0x6200开始以此分配；memory-mapped region从0xD2000000依次分配；
     - 为每个BAR region注册callback：guest访问到BAR region时，触发对应callback；
 
-PCI/PCIe是一个协议，不同类型的设备都可以通过这个协议来实现，例如网卡、HBA卡(SATA controller或者SAS controller)，只不过它们的操作不同：系统读写BAR region，触发的操作不同。各个设备使用的BAR region数也可以不同。可以把virtio看作一个特殊的PCI设备(当然，virtio也可以通过mmio实现，此乃题外话)，所以它可以实现它独特的操作。在kvmtool中，virtio设备实现了这4个capability(代码见virtio/pci-modern.c:virtio_pci_modern_init)：1. virtio通用配置读写；通用配置是指所有virtio设备，virtio-blk, virtio-net, ... 都有的配置，例如配置vring地址和queue的中断；enable/disable queue等；2. 通知设备queue上有available buffer可以处理，即notify-capability；3. isr-capability；4. 设备相关的配置的读写，例如virtio-blk的capacity, cylinder/head/sector数；virtio-net的mac, mtu等。这4个capability的实现在设备的configuration space里有反映，guest系统读了设备的configuration space之后，就知道可以使用设备的这些capability，所以就有了图10代码中的4个操作：
+PCI/PCIe是一个协议，不同类型的设备都可以通过这个协议来实现，例如网卡、HBA卡(SATA controller或者SAS controller)，只不过它们的操作不同(系统读写BAR region触发的操作不同)，实现的Capability不同，使用的BAR region数也可以不同。可以把virtio看作一个特殊的PCI设备(当然，virtio也可以通过mmio实现，此乃题外话)，所以它可以实现它独特的操作。在kvmtool中，virtio设备实现了4个capability(代码见virtio/pci-modern.c:virtio_pci_modern_init)：
+
+- virtio通用配置读写；通用配置是指所有virtio设备，virtio-blk, virtio-net, ... 都有的配置，例如配置vring地址和queue的中断；enable/disable queue等；
+- 通知设备queue上有available buffer可以处理，即notify-capability；
+- isr-capability；
+- 设备相关的配置的读写，例如virtio-blk的capacity, cylinder/head/sector数；virtio-net的mac, mtu等。
+
+这4个capability的实现在设备的configuration space里有反映，guest系统读了设备的configuration space之后，就知道可以使用设备的这些capability，所以就有了图10代码中的4个操作：
 
 ![figure10](virtio-pci-device-in-kvmtool.png)
 <div style="text-align: center;"><em>图10: virtio pci设备</em></div>
 
-Virtio一个显著特点是通过virt-queue来传递请求(可以使用notify-capability机制通知virtio设备virt-queue上有available buffer可以处理，但更常见的是virtio设备直接poll virt-queue)；而真实PCI设备应该是通过对BAR-region的读写操作来触发请求(root complex把对BAR-region的读写操作翻译成TLP并在PCIe bus上发送)。
+Virtio一个显著特点是通过virt-queue来传递请求(可以使用notify-capability机制通知virtio设备virt-queue上有available buffer可以处理，但更常见的是virtio设备直接poll virt-queue)；而真实PCI设备应该是通过对BAR-region的读写操作来触发请求(root complex把对BAR-region的读写操作翻译成TLP并在PCIe bus上发送)。在kvmtool中，启用的3个BAR-region都不是用于设备的读写请求。
 
 在kvmtool中，PCI设备实现的比较统一、简单：每个设备都使用3个BAR。BAR-0和BAR-1功能一样(见上图10)，只不同一个是使用port map，另一个使用memory map；虽然map到的地址不同，但相同偏移触发的功能是一样的。BAR-2用于支持msix capability，详见[kvmtool interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)。
 
