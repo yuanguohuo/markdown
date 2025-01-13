@@ -113,7 +113,7 @@ BAR寄存器存储BAR region的base address和size。在物理机环境下，BIO
 其他寄存器：
 
 - Status：PCI_STATUS_CAP_LIST(0x10)位表示是否支持Capability List;
-- Cap.Pointer：第一个capability的offset；例如第一个capability紧挨着header(第65字节处)，Cap.Pointer = 65；
+- Cap.Pointer：第一个capability的offset；例如若第一个capability紧挨着header(第64字节处)，Cap.Pointer = 64；
 
 ![figure6](type-1-config-space.png)
 <div style="text-align: center;"><em>图6: Type-1 (Bridge) Configuration Space Header</em></div>
@@ -230,7 +230,7 @@ PCI/PCIe是一个协议，不同类型的设备都可以通过这个协议来实
 
 Virtio一个显著特点是通过virt-queue来传递请求(可以使用notify-capability机制通知virtio设备virt-queue上有available buffer可以处理，但更常见的是virtio设备直接poll virt-queue)；而真实PCI设备应该是通过对BAR-region的读写操作来触发请求(root complex把对BAR-region的读写操作翻译成TLP并在PCIe bus上发送)。在kvmtool中，启用的3个BAR-region都不是用于设备的读写请求。
 
-在kvmtool中，PCI设备实现的比较统一、简单：每个设备都使用3个BAR。BAR-0和BAR-1功能一样(见上图10)，只不同一个是使用port map，另一个使用memory map；虽然map到的地址不同，但相同偏移触发的功能是一样的。BAR-2用于支持msix capability，详见[kvmtool interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)。
+在kvmtool中，PCI设备实现的比较统一、简单：每个设备都使用3个BAR。BAR-0和BAR-1功能一样(见上图10)，只不过一个是使用port map，另一个使用memory map；虽然map到的地址不同，但相同偏移触发的功能是一样的。BAR-2用于支持msix capability，详见[kvmtool interrupt virtualization](https://www.yuanguohuo.com/2024/08/11/virtualization-5-kvmtool-interrupt/)。
 
 # 小结 (3)
 

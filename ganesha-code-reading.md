@@ -125,19 +125,23 @@ categories: nas
 <div style="text-align: center;"><em>图2</em></div>
 
 ## mount：建连之后的操作 (2.3)
-- tcp连接建立之后，client立即从新连接发来很多请求。对于NFSv4.0，mount操作就是SETCLIENTID，SETCLIENTID_CONFIRM和PUTROOTFH,GETFH,GETATTR这5个操作。
-    - nfs_null
-    - nfs4_Comp(SETCLIENTID)
-    - nfs4_Comp(SETCLIENTID_CONFIRM)
-    - nfs4_Comp(PUTROOTFH,GETFH,GETATTR)；即current-fh <- root-fh，然后再get current fh; client与此相关的逻辑在linux内核代码`nfs4_xdr_enc_lookup_root`函数中；
-    - nfs4_Comp(PUTFH,GETATTR)
-    - nfs4_Comp(PUTFH,GETATTR)
-    - nfs4_Comp(PUTFH,GETATTR)
-    - nfs4_Comp(PUTFH,GETATTR)
-    - nfs4_Comp(PUTFH,GETATTR)
-    - nfs4_Comp(PUTFH,GETATTR)
-    - nfs4_Comp(PUTFH,ACCESS,GETATTR)
-    - nfs4_Comp(PUTFH,LOOKUP,GETFH,GETATTR); 假如vpc id (vni)不在export的vnis列表，LOOKUP请求会失败，客户端mount会报错: "Operation not permitted".
+- tcp连接建立之后，client立即从新连接发来很多请求。对于NFSv4.0，mount操作就是SETCLIENTID，SETCLIENTID_CONFIRM和PUTROOTFH,GETFH,GETATTR这5个操作。假设mount的export的pseudo path是/foo/bar
+
+    - nfs_null: 测试服务端是否可用；
+    - nfs4_Comp(SETCLIENTID): 协商clientid
+    - nfs4_Comp(SETCLIENTID_CONFIRM): 协商clientid
+    - nfs4_Comp(PUTROOTFH,GETFH,GETATTR)；1.PUTROOTFH: 它的副作用是current-fh <- root-fh，也就是把pseudo filesystem的"/"设置为current filehandle；thread local变量`op_ctx->ctx_export`指向export-0；2.GETFH: 获取current filehandle，即获取"/"的filehandle；3.GETATTR: 获取current filehandle的attributes，即"/"的attributes。Client与此相关的逻辑在linux内核代码`nfs4_xdr_enc_lookup_root`函数中；
+    - nfs4_Comp(PUTFH,GETATTR): 1.PUTFH: 客户端传来一个filehandle，让服务端把这个filehandle设置为current filehandle。客户端传来的就是上一步GETFH返回的filehandle，也就是"/"的filehandle。其实上一步已经把它设置为current filehandle了，所以这一步只是重复操作，没有实际的作用。不过PUTFH是幂等的，所以也不会导致错误。2.GETATTR: 获取current filehandle的attributes，即"/"的attributes；因为上一步已经获取了，所以也没有实际的作用。
+    - nfs4_Comp(PUTFH,GETATTR): 重复操作，没有实际作用；
+    - nfs4_Comp(PUTFH,GETATTR): 重复操作，没有实际作用；
+    - nfs4_Comp(PUTFH,GETATTR): 重复操作，没有实际作用；
+    - nfs4_Comp(PUTFH,GETATTR): 重复操作，没有实际作用；
+    - nfs4_Comp(PUTFH,GETATTR): 重复操作，没有实际作用；
+    - nfs4_Comp(PUTFH,ACCESS,GETATTR): 1.PUTFH: 重复操作；2.ACCESS: 检查对current filehandle(即"/")的访问权限；3.GETATTR: 重复操作；
+    - nfs4_Comp(PUTFH,LOOKUP,GETFH,GETATTR): 1. PUTFH: 还是重复操作，把"/"设置为current filehandle；2.LOOKUP: 它带有一个filename参数，本例中就是"foo"，也就是在"/"中查找"foo"，**并把"/foo"设置为current filehandle(注意，从此current filehandle变了)**. 由于"/foo"不是一个export，所以thread local变量`op_ctx->ctx_export`指向export-0没变；3.GETFH: 返回"/foo"的filehandle。4.GETATTR: 返回"/foo"的attributes;
+    - nfs4_Comp(PUTFH,ACCESS,GETATTR): 1. PUTFH: 客户端传来一个filehandle，让服务端把这个filehandle设置为current filehandle。客户端传来的就是上一步GETFH返回的filehandle，也就是"/foo"的filehandle。所以，这一步也是重复操作，没有实际作用。2.ACCESS: 检查对current filehandle(即"/foo")的访问权限；3.GETATTR: 返回"/foo"的attributes，上一步已经返回了，所以也是重复。
+    - nfs4_Comp(PUTFH,LOOKUP,GETFH,GETATTR)：1.PUTFH: 重复操作，还是把"/foo"设置为current filehandle；2.LOOKUP: 在"/foo"中查找"bar"，**并把"/foo/bar"设置为current filehandle(注意，current filehandle又变了)**. 由于"/foo/bar"是一个export，所以thread local变量`op_ctx->ctx_export`指向export-{bar的exportId}；**这里还会检查export允许的vpc**，假如vpc id (vni)不在export的vnis列表，LOOKUP请求会失败，客户端mount会报错: "Operation not permitted"；3.GETFH: 返回"/foo/bar"的filehandle；4.GETATTR: 返回"/foo/bar"的attribute;
+    - 读写操作......
 - 这些请求的具体语义见后面章节，本节梳理它们的流程处理。
 - server端的循环poll routine(entry函数`svc_rqst_epoll_loop`)在Serving-Chan(epoll实例)poll到事件；
 - 调用svc_rqst_epoll_events()函数。和2.2节调用`svc_rqst_epoll_events`之**偷梁换柱**逻辑一样：起routine异步处理第一个之后的事件；当前负责poll的routine去处理第一个事件(代码注释说"use this hot thread for the first event")，即调用`svc_rqst_xprt_task`：
@@ -311,7 +315,7 @@ NFS4.0协议原文:
 - PUTROOTFH把root-filehandle(export的根目录?)设置为current-filehandle，所以不需要参数；
 - PUTPUBFH把public-filehandle(server端维护，administrator管理)设置为current-filehandle，所以不需要参数；
 
-对于READ这样的操作，需要一个file作为参数，即current-filehand。而对于LINK, RENAME, 这样的操作，需要两个file参数，怎么办呢？答案是saved-filehandle;
+对于READ这样的操作，需要一个file作为参数，即current-filehandle。而对于LINK, RENAME, 这样的操作，需要两个file参数，怎么办呢？答案是saved-filehandle;
 
 ```
    link {SAVED_FH指向的file} {CURRENT_FH指向的dir}/newname

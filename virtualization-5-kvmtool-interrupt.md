@@ -56,13 +56,13 @@ In the end, GSIs (or in ACPI words, system vectors) must be mapped to IRQs
 
 Traditionally, a device has an interrupt line (pin) which it asserts when it wants to signal an interrupt to the host processing environment. This traditional form of interrupt signalling is an out-of-band form of control signalling since it uses a dedicated path to send such control information, separately from the main data path.
 
-MSI replaces those dedicated interrupt lines with in-band signalling, by exchanging special messages that indicate interrupts through the main data path. In particular, MSI allows the device to write a small amount of interrupt-describing data to a special memory-mapped I/O address (CPU core内集成的Local-APIC的寄存器，被map到特定memory address), and the chipset then delivers the corresponding interrupt to a processor.
+MSI replaces those dedicated interrupt lines with in-band signalling, by exchanging special messages that indicate interrupts through the main data path. In particular, MSI allows the device to write a small amount of interrupt-describing data to a special memory-mapped I/O address (集成于CPU core内的Local-APIC的寄存器，被map到特定的memory address), and the chipset then delivers the corresponding interrupt to a processor.
 
 On Intel x86 systems, the Local-APIC (LAPIC) must be enabled for the PCI (and PCIe) MSI/MSI-X to work, even on uniprocessor (single core) systems. In these systems, MSIs are handled by writing the interrupt vector directly into the LAPIC of the processor/core that needs to service the interrupt.
 
 As an example, PCI Express does not have separate interrupt pins at all; instead, it uses special in-band messages to allow pin assertion or deassertion to be emulated.
 
-并且一个PCIe设备通常是多队列的，每个队列可以触发一个不同的中断(不同GSI)。并且，不同的中断通过affinity绑定不同的CPU处理，就实现了负载均衡。
+一个PCIe设备通常是多队列的，每个队列可以触发一个不同的中断(不同GSI)。并且，不同的中断通过affinity绑定不同的CPU处理，就实现了负载均衡。
 
 ## How MSI Works (1.7)
 
@@ -148,12 +148,12 @@ MSI和MSI-X是两个不同的版本，引用维基百科：
 - 上半部分是模拟传统的中断方式，即PIC或者IO-APIC：一个gsi号最终被map到一个芯片的引脚上，也就得到了IRQ号：例如Master-8259A的pin0是IRQ0，pin1是IRQ1，pin2没用，pin3是IRQ3，……；Slave-8259A的pin0是IRQ8，pin1是IRQ9，……，pin7是IRQ15；IO-APIC的pin0没用，pin1是IRQ1，pin2是IRQ0，pin3是IRQ3，……，pin23是IRQ23；
 - 下半部分是模拟MSI中断方式：一个gsi号最终被map到addr和data；若要触发此中断，就往对应的addr写对应的data；
 
-有一点要注意：在这张表中，gsi不是唯一的。是这么回事：要触发某个gsi对应的中断，可能由PIC芯片处理，也可能由IO-APIC处理，到时候逐一调用，哪个能处理哪个处理。应该是连接方式决定的，一个硬件要是连在PIC上就由PIC处理，要是连在IO-APIC上就由IO-APIC处理。
+有一点要注意：在这张表中，gsi不是唯一的，但这并不会引起混淆：要触发某个gsi对应的中断，可能由PIC芯片处理，也可能由IO-APIC处理，到时候逐一调用，哪个能处理哪个处理。应该是连接方式决定的，一个硬件要是模拟连在PIC上就由PIC处理，要是模拟连在IO-APIC上就由IO-APIC处理。
 
 中断路由表是kvmtool在内存中构造的，然后后通过如下接口设置到kvm内核模块:
 
 ```c
-ioctl(vm_fd, KVM_SET_GSI_ROUTING, 表的地址);
+ioctl(vm_fd, KVM_SET_GSI_ROUTING, 中断路由表地址);
 ```
 
 有了中断路由表，kvm内核模块就可以模拟中断机制。如前所述，kvm内核模块完成主要的中断模拟工作：
@@ -309,14 +309,14 @@ kvmtool/virtio/pci.c : virtio_pci__init() 每个PCI设备都由本函数初始�
         //设置支持Capability List; PCI_STATUS_CAP_LIST=0x10.
         .status            = cpu_to_le16(PCI_STATUS_CAP_LIST),
     
-        //.capabilities=65. Capability List的头在第65字节处，即第一个capability是msix;
+        //.capabilities=64. Capability List的头在第64字节处，即第一个capability是msix;
         .capabilities        = PCI_CAP_OFF(&vpci->pci_hdr, msix),
     
         ...
     };
 ```
 
-我们看kvmtool中模拟的PCI configuration space，capability msix是不是在第65字节处：
+我们看kvmtool中模拟的PCI configuration space，capability msix是不是在第64字节处：
 
 ```c
 struct pci_device_header {
@@ -362,7 +362,7 @@ struct pci_device_header {
 };
 ```
 
-果然，capability msix就是在第65字节处。看它的初始化：
+果然，capability msix就是在第64字节处。看它的初始化：
 
 ```c
     vpci->pci_hdr.msix.cap = PCI_CAP_ID_MSIX;
