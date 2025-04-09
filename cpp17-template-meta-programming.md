@@ -5,7 +5,7 @@ tags: [template]
 categories: c++
 ---
 
-初步尝试C++模版元编程。元编程考虑的是编译时的逻辑，和运行时不同，常常觉得违法直觉。
+初步尝试C++模版元编程。元编程考虑的是编译时的逻辑，和运行时不同，有点不太习惯，要时刻记住**编译时**!
 
 <!-- more -->
 
@@ -45,7 +45,7 @@ int main()
 {
   float  target = 100.0;
   char   c = 'a';
-  short  s = 1; 
+  short  s = 1;
   int    i = 2;
   float  f = 3.0;
   double d = 4.0;
@@ -103,7 +103,7 @@ int main()
 {
   Foo    target(1);
   char   c = 'a';
-  short  s = 1; 
+  short  s = 1;
   int    i = 2;
   Foo    f(2);
   double d = 4.0;
@@ -420,14 +420,504 @@ int main()
   using IndexSeq1 = std::index_sequence<2, 2, 2, 2>;
   using IndexSeq2 = std::make_index_sequence<4>;
 
-  //打印：
-  //  void print_type_arg() [with T = std::integer_sequence<long unsigned int, 2, 2, 2, 2>]
+  //打印：void print_type_arg() [with T = std::integer_sequence<long unsigned int, 2, 2, 2, 2>]
   print_type_arg<IndexSeq1>();
 
-  //打印：
-  //  void print_type_arg() [with T = std::integer_sequence<long unsigned int, 0, 1, 2, 3>]
+  //打印：void print_type_arg() [with T = std::integer_sequence<long unsigned int, 0, 1, 2, 3>]
   print_type_arg<IndexSeq2>();
 
+  return 0;
+}
+```
+
+# 常量表达式 (3)
+
+## 常量表达式(3.1)
+
+常量表达式是**编译期已知的不可变值**，有5种：
+
+- **字面量(Literals)**
+
+```cpp
+42          // int 字面量
+3.14        // double 字面量
+"hello"     // 字符串字面量（类型为 const char[6]）
+```
+
+- **用constexpr声明的变量**
+
+```cpp
+#include <iostream>
+
+int main()
+{
+  constexpr int a = 10;           // 合法
+  constexpr double b = a * 2.5;   // 合法
+  // constexpr int c = rand();    // error: call to non-‘constexpr’ function ‘int rand()’
+
+  //打印：10 25
+  std::cout << a << " " << b << std::endl;
+
+  return 0;
+}
+```
+
+- **只涉及常量表达式的运算**
+
+```cpp
+#include <iostream>
+
+int main()
+{
+  constexpr int x = 5 + 3;            // 8
+  constexpr int y = x << 2;           // 32
+  constexpr int z = sizeof(int) * 8;  // 32（假设 int 为 4 字节）
+
+  //打印：8 32 32
+  std::cout << x << " " << y << " " << z << std::endl;
+
+  return 0;
+}
+```
+
+- **枚举值**
+
+```cpp
+#include <iostream>
+
+enum Color
+{
+  Red = 1,
+  Green = 2
+};
+
+int main()
+{
+  constexpr int c = Red; // 合法
+  //打印：1
+  std::cout << c << std::endl;
+  return 0;
+}
+```
+
+- **constexpr函数（当参数是常量表达式时）**
+
+```cpp
+#include <iostream>
+#include <stdlib.h>
+
+constexpr int add(int a, int b)
+{
+  return a + b;
+}
+
+int main()
+{
+  constexpr int   sum1 = add(3, 4);             // 合法，sum1 = 7
+  const int       sum3 = add(rand(), rand());   // 合法：但sum3不是常量表达式
+  // constexpr int sum2 = add(rand(), rand());  // 非法！error: call to non-‘constexpr’ function ‘int rand()’
+
+  // 打印： 7 -1643747027
+  std::cout << sum1 << " " << sum3 << std::endl;
+
+  return 0;
+}
+```
+
+虽然带有constexpr关键字，函数是否是常量表达式取决于上下文。可以这么理解：constexpr使一个函数可以出现在需要常量表达的地方，但不一定非要在那种情景下使用。见3.3节！
+
+## 常量表达式的应用场景 (3.2)
+
+- 数组大小定义
+- 模板参数
+
+```cpp
+template <int Size>
+struct Array
+{
+};
+
+Array<5> arr;  // 合法：5 是常量表达式
+```
+
+- 静态断言（Static Assert）
+
+```cpp
+static_assert(sizeof(int) == 4, "int must be 4 bytes");
+```
+
+- 编译时计算
+
+```cpp
+#include <iostream>
+
+constexpr int factorial(int n) {
+  return (n <= 1) ? 1 : n * factorial(n - 1);
+}
+constexpr int fact_5 = factorial(5); // 120（编译期计算）
+
+int main()
+{
+  //打印：120
+  std::cout << fact_5 << std::endl;
+}
+```
+
+## constexpr (3.3)
+
+第3.1节说过，`constexpr`关键字是声明**常量表达式**的方式之一！
+
+- **constexpr变量**：必须在编译期初始化，且initializer必须是常量表达式！
+
+```cpp
+constexpr int x = 42;             // 编译期确定
+constexpr int y = x + 1;          // 编译期确定
+//constexpr int z = rand();       // 错误：rand() 不是常量表达式
+```
+
+- **constexpr函数**：可以在编译期调用，也可以在运行时调用，即**取决于上下文**：
+    - 编译期调用：当参数是编译期常量且结果用于需要常量表达式的场景（如数组大小、模板参数）。
+    - 运行期调用：当参数是运行时变量或结果不用于常量表达式场景!
+
+```cpp
+#include <iostream>
+#include <string>
+
+constexpr int add(int a, int b)
+{
+  return a + b;
+}
+
+int main()
+{
+  constexpr int a = add(1, 2);      // 编译期求值
+  std::string array[a];             // 合法！
+  int b = add(3, 4);                // 可能编译期或运行期求值（取决于优化）
+  int c = add(rand(), rand());      // 运行期求值
+
+  //打印：3 7 -1643747027
+  std::cout << a << " " << b << " " << c << std::endl;
+
+  return 0;
+}
+```
+
+如第3.1节所述，虽然带有constexpr关键字，函数是否是常量表达式取决于上下文。可以这么理解：constexpr使一个函数可以出现在需要常量表达的地方，但不一定非要在那种情景下使用。
+
+## static constexpr vs static const (3.4)
+
+```cpp
+#include <iostream>
+
+template<class T, T v>
+struct MyTemp
+{
+  static constexpr T value1 = v;
+  static const     T value2 = v;
+};
+
+int main()
+{
+  using TempInst1 = MyTemp<int, 3>;
+
+  const int* p1 = &TempInst1::value1;
+
+  // const int* p2 = &TempInst1::value2; //导致链接错误：undefined reference to `MyTemp<int, 3>::value2'
+
+  //打印：3
+  std::cout << *p1 << std::endl;
+  return 0;
+}
+```
+
+- static constexpr T value1 = v;
+
+    - 编译期常量：constexpr强制要求变量在编译期初始化，且必须用常量表达式赋值。
+    - 隐式内联（C++17起）：允许T是任何字面类型，无需在类外定义即可直接使用（包括取地址），编译器自动处理存储。注意：C++17前，若T是类类型，仍需在类外定义！
+
+
+- static const T value = v;
+
+    - 运行时常量：const仅表示变量不可修改，初始化可以发生在运行时，也可以发生在编译期！
+    - ODR依赖：若T是整型或枚举类型，允许类内初始化，其他类型（如double、类类型）必须在类外定义（即使有类内初始化）！若程序中使用其地址（ODR-used），必须在类外定义，否则可能引发链接错误。
+
+
+ODR（One Definition Rule，单一定义规则）依赖：同一个实体（变量、函数、类等）在程序中必须有且仅有一个定义。违反 ODR 会导致未定义行为（UB），常见表现是编译或链接错误。
+
+也就是说，当`T`**不为整型或枚举类型时**，`value2`必须在类外定义！
+
+```cpp
+MyTemp::value2 = ...
+```
+
+而无论`T`是什么类型`value1`都不必在类外定义（C++17起）！
+
+## constexpr vs. const (3.5)
+
+|  特性              | constexpr                           | const                                     |
+|--------------------|-------------------------------------|-------------------------------------------|
+|变量初始化时机      | 编译期，一定是常量表达式            | 编译期或运行时，不一定（依赖initializer） |
+|函数调用时机        | 编译期或运行时(取决于上下文)        | 始终运行期调用（普通函数行为）            |
+|static成员变量      | 编译期常量，隐式内联（C++17起）     | 运行时常量，ODR依赖                       |
+|适用场景            | 需要编译期确定的常量或逻辑          | 运行时常量                                |
+
+# SFINAE原则 (4)
+
+SFINAE（Substitution Failure Is Not An Error） 是 C++ 模板元编程中的核心原则，它允许在模板参数替换失败时不触发编译错误，而是将该模板候选从重载集中静默剔除。
+
+## SFINAE的核心机制 (4.1)
+
+当编译器尝试实例化一个模板时，会经历以下步骤：
+
+- 替换（Substitution）：将模板参数代入模板声明，生成具体函数/类的签名。
+- 检查有效性：验证代入后的模板代码是否合法（例如类型是否匹配、成员是否存在等）。
+- 处理失败：
+    - 如果替换失败（如访问不存在的成员、类型不兼容等），且失败发生在 直接替换过程 中（而非函数体内部），则根据 SFINAE 原则，忽略该候选模板，继续查找其他候选。
+    - 如果所有候选均失败，才会报错。
+
+
+看下面这段代码：
+
+
+```cpp
+#include <iostream>
+#include <type_traits>
+
+// 仅对整数类型有效
+template<typename T>
+typename std::enable_if<std::is_integral<T>::value, void>::type
+process(T value)
+{
+  std::cout << "处理整数：" << value << std::endl;
+}
+
+// 仅对浮点类型有效
+template<typename T>
+typename std::enable_if<std::is_floating_point<T>::value, void>::type
+process(T value)
+{
+  std::cout << "处理浮点：" << value << std::endl;
+}
+
+int main() {
+
+  // 打印：处理整数：3
+  process(3);          // 匹配整数版本（浮点版本被 SFINAE 剔除）
+
+  // 打印：处理浮点：3.14
+  process(3.14);       // 匹配浮点版本（整数版本被 SFINAE 剔除）
+
+  // process("hello"); // 无匹配版本：no matching function for call to ‘process(const char [6])’
+}
+```
+
+这是一段合法代码，可编译运行。编译器在处理`process(42)`时，**替换阶段**会产生：
+
+```cpp
+typename std::enable_if<true, void>::type
+process(T value) { /* 处理整数 */ }
+
+typename std::enable_if<false, void>::type
+process(T value) { /* 处理浮点数 */ }
+```
+
+注意`std::enable_if<B, T>`在`B=false`时，根本就没有`type`成员！也就是说，**替换阶段**就失败了。假如没有SFINAE机制，那么，就会导致编译失败，终止！
+
+而有了SFINAE机制，编译器只会把这个**失败的替换**静默丢弃，不视为错误。
+
+同理，编译器处理`process(3.14)`时，也会产生2个替换，并丢弃**失败的替换**。最终，两个正确的替换被保留下来。
+
+所以，与编译错误的关键区别是：SFINAE失败仅影响重载选择，若最终无合法候选，才会触发编译错误。
+
+## SFINAE的替代方案 (4.2)
+
+- if constexpr：在函数体内部实现编译期条件分支，避免多份重载（C++17起）
+
+```cpp
+#include <iostream>
+#include <type_traits>
+
+template<typename T>
+void process(T value) {
+  if constexpr (std::is_integral_v<T>) {
+    std::cout << "处理整数: " << value << std::endl;
+  } else if constexpr (std::is_floating_point_v<T>) {
+    std::cout << "处理浮点: " << value << std::endl;
+  } else {
+    static_assert(std::is_integral_v<T> || std::is_floating_point_v<T>, "Unsupported type");
+  }
+}
+
+int main()
+{
+  // 打印：处理整数: 3
+  process(3);
+
+  // 打印：处理浮点: 3.14
+  process(3.14);
+
+  // process("hello");  // error: static assertion failed: Unsupported type
+  return 0;
+}
+```
+
+- Concepts：通过requires直接约束模板参数（C++20起）
+
+注：下面的代码Linux/gcc环境`g++ --std=c++2a`无法编译! 而Clang环境(macOS/Linux)下`clang++ --std=c++2a`可以编译运行!
+
+```cpp
+#include <iostream>
+#include <type_traits>
+
+template<typename T>
+  requires std::is_integral_v<T> || std::is_floating_point_v<T>
+void process(T value)
+{
+  std::cout << "处理整型或浮点: " << value << std::endl;
+}
+
+int main()
+{
+  // 打印：处理整型或浮点: 3
+  process(3);
+
+  // 打印：处理整型或浮点: 3.14
+  process(3.14);
+
+  // process("hello");  // error: no matching function for call to 'process'
+  return 0;
+}
+```
+
+## enable_if (4.3)
+
+- 基本定义
+
+当B为true：`enable_if_t<B, T>`等价于T；当B为false：`enable_if<B, T>` 无`type`成员，导致模板替换失败（SFINAE）。
+
+```cpp
+template<bool B, class T = void>
+struct enable_if {};
+
+template<class T>
+struct enable_if<true, T> {
+    using type = T;  // 当条件为 true 时定义 type 成员
+};
+
+// C++14 起提供的别名模板简化版本
+template<bool B, class T = void>
+using enable_if_t = typename enable_if<B, T>::type;
+```
+
+- 核心用途1：控制函数模板的重载
+
+比`if constexpr`可读性差，见4.2节。
+
+```cpp
+#include <iostream>
+#include <type_traits>
+
+// 实现1：针对整数类型
+template<typename T>
+std::enable_if_t<std::is_integral_v<T>, void>
+process(T value) {
+  std::cout << "处理整数: " << value << std::endl;
+}
+
+// 实现2：针对浮点类型
+template<typename T>
+std::enable_if_t<std::is_floating_point_v<T>, void>
+process(T value) {
+  std::cout << "处理浮点: " << value << std::endl;
+}
+
+int main()
+{
+  //打印：处理整数: 3
+  process(3);
+
+  //打印： 处理浮点: 3.14
+  process(3.14);
+
+  // process("hello"); //error: no matching function for call to ‘process(const char [6])’
+}
+```
+
+- 核心用途2：约束类模板参数
+
+```cpp
+#include <iostream>
+#include <string>
+#include <type_traits>
+
+// 仅当T是算术类型时可用
+template<typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+struct MyContainer {
+};
+
+int main() {
+  MyContainer<int> c1;             // 编译通过
+
+  // MyContainer<std::string> c2;  // error: template argument 2 is invalid
+
+  return 0;
+}
+```
+
+首先，`typename = std::enable_if_t<...>`是**未命名类型参数，即类型参数名被省略，因为不需要在类内使用**。补全的话是:
+
+```cpp
+template<typename T, typename Dummy = std::enable_if_t<std::is_arithmetic_v<T>>>
+```
+
+其次，满足`is_arithmetic_v`时，得到的是`void`；其实是什么类型都是无所谓，例如改写成这样，是等效的：
+
+```cpp
+template<typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>, std::string>>
+```
+
+因为这个**未命名类型参数的作用是约束模版只对算术类型的T有效**，若是非算术类型，`enable_it<false>::value`没有定义。
+
+不过，上面这个代码可读性差（见4.2节），下面是使用`requires`重新实现：
+
+注：下面的代码Linux/gcc环境`g++ --std=c++2a`无法编译! 而Clang环境(macOS/Linux)下`clang++ --std=c++2a`可以编译运行!
+
+```cpp
+#include <iostream>
+#include <string>
+#include <type_traits>
+
+// 仅当T是算术类型时可用
+template<typename T>
+  requires std::is_arithmetic_v<T>
+struct MyContainer {
+};
+
+int main() {
+  MyContainer<int> c1;             // 编译通过
+
+  // MyContainer<std::string> c2;  // error: constraints not satisfied for class template 'MyContainer' [with T = std::basic_string<char>]
+
+  return 0;
+}
+```
+
+- 常见错误：条件重叠导致歧义
+
+```cpp
+#include <string>
+#include <type_traits>
+
+template<typename T>
+std::enable_if_t<std::is_integral_v<T>, void> func(T) {}
+
+template<typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, void> func(T) {}
+
+int main()
+{
+  // 条件重叠（整数也是算术类型）
+  // func(3); //error: call of overloaded ‘func(int)’ is ambiguous
   return 0;
 }
 ```

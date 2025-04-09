@@ -173,12 +173,12 @@ class MyTemp<std::tuple<U,V,W>, char[a], double[b]> {
 };
 ```
 
-当“type-arg-list-2”固定的时候，“type-arg-list-1”不但没有缩短，反而曾长了！特化/偏特化确实是固化“type-arg-list-2”中的类型参数，但不是为了缩短“type-arg-list-1”！实际上，**“type-arg-list-1”为“type-arg-list-2”提供类型信息**：即**“type-arg-list-2”中的一切未固定信息，例如类型参数，int参数等，都要由“type-arg-list-1”提供**。
+当“type-arg-list-2”固定的时候，“type-arg-list-1”不但没有缩短，反而曾长了！特化/偏特化确实是固化“type-arg-list-2”中的类型参数，但不是为了缩短“type-arg-list-1”！实际上，**“type-arg-list-1”为“type-arg-list-2”提供类型信息**：即**“type-arg-list-2”中的一切未固定信息，例如类型参数，非类型参数（例如int参数）等，都要由“type-arg-list-1”提供**。
 
 - 对于偏特化1和偏特化2的简单情形，在“type-arg-list-2”固化的过程中，需要的类型信息减少了，所以“type-arg-list-1”缩短了。甚至在“full-specialization”中“type-arg-list-1”缩为0，因为“type-arg-list-2”不需要任何类型信息；
 - 但对于偏特化3，为了固化“type-arg-list-2”：`T1`固化为`std::tuple<U,V,W>`需要3个类型参数`U`, `V`和`W`；`T2`固化为`char[a]`，`T3`固化为`double[b]`还需要2个`int`类型的型参`a`和`b`；这些都需要“type-arg-list-1”来提供。
 
-在为一个模版提供特化/偏特化的时候也是这个思路：**先想着去固定`T1`, `T2`和`T3`；当这些类型能全部固定的时候，就是全特化，“type-arg-list-1”为空；当这些类型中有不可以固定的东西，无论是类型参数，还是`int`这样的变量参数，都放到“type-arg-list-1”中，这就是偏特化**。
+在为一个模版提供特化/偏特化的时候也是这个思路：**先想着去固定`T1`, `T2`和`T3`；当这些类型能全部固定的时候，就是全特化，“type-arg-list-1”为空；当这些类型中有不可以固定的东西，无论是类型参数，还是`int`这样的非类型参数，都放到“type-arg-list-1”中，这就是偏特化**。
 
 那么如何实例化偏特化3呢？
 
@@ -255,74 +255,108 @@ partial-specialized-4: [with U = int;
 
 # 特化模版会继承主模版的基类吗 (4)
 
-先说答案：**不同编译器行为不同!**
+先说答案：不会！
 
 ```cpp
 #include <iostream>
+#include <utility>
 #include <string>
 #include <string_view>
-#include <tuple>
-#include <utility>
 
-using namespace std;
+template <class T, size_t N>
+struct Aligned;
 
-template<typename T>
-class B {
-  public:
-    static_assert(false, "B cannot be instantiated");
+//主模版
+template <class T>
+struct NotAligned {
+  static_assert(std::is_same<T, float>::value, "only NotAligned<float> allowed");
 };
 
-template<typename T>
-class C : B<T> {
-  public:
-    static void print_type_info() {
-      std::string_view name = __PRETTY_FUNCTION__;
-      name.remove_prefix(name.find("print_type_info() ") + 18);
-      std::cout << "generalized-type: " << name << std::endl;
-    }
+//偏特化
+template <class T, size_t N>
+struct NotAligned<const Aligned<T, N>> {
+  static_assert(std::is_same<T, double>::value, "only NotAligned<const Aligned<double, N>> allowed");
 };
 
-template<typename T>
-class C<std::tuple<T>> {
-  public:
-    static void print_type_info() {
-      std::string_view name = __PRETTY_FUNCTION__;
-      name.remove_prefix(name.find("print_type_info() ") + 18);
-      std::cout << "partial-specialized: " << name << std::endl;
-    }
+//主模版
+template <class T>
+struct Type : NotAligned<T> {
+  using type = T;
+  static void info() {
+    std::cout << "general-type: " << __PRETTY_FUNCTION__ << std::endl;
+  }
 };
-```
 
-因为`static_assert(false, ...)`，所以`B`不能被实例化！实例化一个`C`的类时，若命中主模版则编译失败，这个对于MacOS/clang和Linux/gcc行为是一样的！
+//偏特化
+template <class T, size_t N>
+struct Type<Aligned<T, N>> {
+  using type = T;
+  static void info() {
+    std::cout << "specialized-type: " << __PRETTY_FUNCTION__ << std::endl;
+  }
+};
 
-```cpp
-using C1 = C<int>;
-C1::print_type_info(); //error: static assertion failed: B cannot be instantiated
-```
+int main()
+{
+  // 打印：
+  // general-type: static void Type<T>::info() [with T = float]
+  using TpFloat = Type<float>; //必须为float
+  TpFloat::info();
 
-捣鬼的是命中偏特化的情形：
+  // 打印：
+  // general-type: static void Type<T>::info() [with T = const Aligned<double, 16>]
+  using TpConstAlignedDouble = Type<const Aligned<double, 16>>; //必须为double
+  TpConstAlignedDouble::info();
 
-```cpp
-using C2 = C<std::tuple<int>>;
-C2::print_type_info();
+  // 打印：
+  // specialized-type: static void Type<Aligned<T, N> >::info() [with T = int; long unsigned int N = 32]
+  using TpAlignedX = Type<Aligned<int, 32>>; //int可以随意换：short, size_t, string, ...
+  TpAlignedX::info();
+
+  return 0;
+}
+
 ```
 
 MacOS/clang编译器输出(c++17)：
 
 ```
-partial-specialized: [T = std::tuple<int>]
+general-type: static void Type<float>::info() [T = float]
+general-type: static void Type<const Aligned<double, 16>>::info() [T = const Aligned<double, 16>]
+specialized-type: static void Type<Aligned<int, 32>>::info() [T = Aligned<int, 32>]
 ```
 
 Linux/gcc编译器则编译出错，输出(c++17)：
 
 ```
- error: static assertion failed: B cannot be instantiated
-     static_assert(false, "B cannot be instantiated");
+general-type: static void Type<T>::info() [with T = float]
+general-type: static void Type<T>::info() [with T = const Aligned<double, 16>]
+specialized-type: static void Type<Aligned<T, N> >::info() [with T = int; long unsigned int N = 32]
 ```
 
-那是不是Linux/gcc命中了主模版呢(匹配规则不同)？不是的，把`static_assert`注释掉，可以发现，Linux/gcc也是命中偏特化。所不同的是，它也会实例化主模版的基类！
+首先，`NotAligned`的主模版只允许实例化`NotAligned<float>`；而偏特化`NotAligned<const Aligned<T, N>>`只允许实例化`T=double`；
 
+然后，看`main()`中的几个实例化类：
 
-# 小节 (5)
+- `TpFloat`：匹配`Type`的主模板，并且编译器推导出`T=float`；继承`NotAligned<T>`时，也匹配其主模版；主模版只允许`NotAligned<float>`，这里`T`刚好是`float`，满足`static_assert`！
+- `TpConstAlignedDouble`：也匹配`Type`的主模版，是的，没错，`const`是类型的一部分，所以不能匹配`Type<Aligned<...>>`特化！匹配`Type<T>`时，编译器推导出`T=const Aligned<double, 16>`；继承`NotAligned<T>`时，匹配其偏特化`NotAligned<const Aligned<T, N>>`！在这个偏特化中，编译器又推导出`T=double`！也满足`static_assert`!
+- `TpAlignedX`：匹配`Type`的偏特化`Type<Aligned<T, N>>`。假如这个偏特化也继承主模版的基类`NotAligned`，无论匹配`NotAligned`的主模版还是偏特化，`static_assert`都不会满足！
+
+所以，**一旦匹配特化或偏特化，就和主模板没有任何关系，不会继承主模版的基类**！
+
+# 对比模版别名 (5)
+
+其实，模版(偏)特化和模版别名没有关系：**特化是为特定参数定制行为，产生了新的实现**；而**模版别名只是简化名称，不改变行为**！
+只是，模版别名定义时和偏特化有点像：
+
+```cpp
+template<type-arg-list-2>
+using TempAlias = Temp<type-arg-list-2>;
+```
+
+要填写“type-arg-list-2”，其中的一切未固定信息（类型参数、非类型参数）都要写到“type-arg-list-1”中！
+假如所有信息都固定了，则不需要写`template<>`，这和模版完全特化有点区别。
+
+# 小节 (6)
 
 总结C++模版的特化以及偏特化，特别是偏特化中的复杂情况。
