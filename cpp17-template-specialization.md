@@ -344,7 +344,51 @@ specialized-type: static void Type<Aligned<T, N> >::info() [with T = int; long u
 
 所以，**一旦匹配特化或偏特化，就和主模板没有任何关系，不会继承主模版的基类**！
 
-# 对比模版别名 (5)
+# 显示实例化 (5)
+
+```cpp
+#include <iostream>
+#include <typeinfo>
+
+using namespace std;
+
+template<typename T>
+void foo()
+{
+  std::cout << "foo("  << typeid(T).name() << ")" << std::endl;
+}
+
+template void foo<int>();
+
+int main()
+{
+  foo<int>();
+  foo<double>();
+  return 0;
+}
+```
+
+MacOS/clang编译器(c++17)和Linux/gcc编译器(c++17)都输出：
+
+```
+foo(i)
+foo(d)
+```
+
+注意：`template void foo<int>();`的作用是什么呢？**其实并没有直接作用**：`foo<int>()`和`foo<double>`行为是一样的！而并没有声明`template void foo<double>();`
+
+这是一种**显式实例化**（Explicit Instantiation）语法。它的作用是**强制要求编译器在当前位置生成目标实例**。特点是，`template`后面没有`<>`，并且函数没有body！
+
+在本例中，就是强制要求编译器生成`foo<int>(){...}`函数实例；虽然没有强制要求生成`foo<double>(){...}`，但编译器在编译`foo<double>();`的时候，**也能够自动推导出需要那样一个实例**！
+
+显式实例化的作用：
+
+- 控制编译单元：在大型项目中，显式实例化可以用于集中管理模板实例化，减少编译时间。Yuanguo：假如在moduleA中定义模版而在moduleB, moduleC, ...中使用；在moduleA中显示实例化可以让这些模版实例集中在一起(moduleA中)？
+- 提前生成代码：编译器会在此处生成foo<int>的具体实现代码。
+- 避免隐式实例化：后续代码中如果调用foo<int>()，将直接使用此处生成的实例化版本，而不会隐式生成重复代码。
+
+
+# 对比模版别名 (6)
 
 其实，模版(偏)特化和模版别名没有关系：**特化是为特定参数定制行为，产生了新的实现**；而**模版别名只是简化名称，不改变行为**！
 只是，模版别名定义时和偏特化有点像：
@@ -357,6 +401,6 @@ using TempAlias = Temp<type-arg-list-2>;
 要填写“type-arg-list-2”，其中的一切未固定信息（类型参数、非类型参数）都要写到“type-arg-list-1”中！
 假如所有信息都固定了，则不需要写`template<>`，这和模版完全特化有点区别。
 
-# 小节 (6)
+# 小节 (7)
 
 总结C++模版的特化以及偏特化，特别是偏特化中的复杂情况。
