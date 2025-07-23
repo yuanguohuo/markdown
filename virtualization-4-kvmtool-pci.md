@@ -26,11 +26,11 @@ Kvmtool可以认为是一个极简版的qemu (所处软件层、功能都和qemu
     - function : 3-bit
 - 对操作系统来说，function就是独立的PCI硬件设备，由domain:bus:device.function唯一定位。可以理解为一张物理卡(设备)上包含多个PCI设备。后文说一个PCI设备多数是指一个function。
 - Typical PCI devices:
-    - Bridges: Host/North Bridge (class=0x060000), PCI-to-PCI bridge (class=0x060400)
+    - Bridges: Host Bridge (class=0x060000), PCI-to-PCI bridge (class=0x060400)
     - HBA: SATA controller (class=0x010601), SAS controller (class=0x010700) 
     - Network Adapter (class=0x020000) 
     - and so on.
-- 引用维基百科PCIe：Similar to a host bridge in a PCI system, the root complex generates transaction requests on behalf of the CPU ... 所以在PCI系统中，host bridge (north bridge) 负责生成transaction requests (TLP: Transaction Layer Packet).
+- 引用维基百科PCIe：Similar to a host bridge in a PCI system, the root complex generates transaction requests on behalf of the CPU ... 所以在PCI系统中，host bridge负责生成transaction requests (TLP: Transaction Layer Packet).
 
 ## PCIe (1.2)
 
@@ -41,7 +41,7 @@ Kvmtool可以认为是一个极简版的qemu (所处软件层、功能都和qemu
 
 PCI device是通过switch连到root complex的，所以switch内部各个port到root complex的连线是独立的，如下图所示：
 
-![figure3](pcie-switch.jpeg)
+![figure3](pcie-switch.png)
 <div style="text-align: center;"><em>图3: PCIe Switch</em></div>
 
 可见，switch就是若干internel bus和若干PCI-to-PCI bridge的组合。所谓point-to-point topology，是不是使用更多的internal bus和PCI-to-PCI bridge让每个PCI设备都有单独的link？另外，在真实服务器上使用`lspci -vv`命令查看发现bus number并不连续，是不是因为"internal bus"的number看不到？
@@ -52,8 +52,8 @@ PCI device是通过switch连到root complex的，所以switch内部各个port到
 
 从这个图可以看出:
 
-- root complex和switch的内部结构一样：也是internel bus和PCI-to-PCI bridge的组合；
-- 只不过**upstream bridge就是host bridge** (north bridge)；
+- root complex和switch的内部结构一样：也是internel bus和PCI-to-PCI bridge的组合(root complex还有别的组件和功能)。
+- 不过**upstream bridge就是host bridge**；
 
 摘自维基百科：
 
@@ -62,10 +62,21 @@ Similar to a host bridge in a PCI system, the root complex generates transaction
 - root complex可能在主板上或者CPU内部;
 - root complex负责生成transaction requests (TLP: Transaction Layer Packet); 每个PCI-to-PCI bridge和PCI endpoint设备通过memory-mapping和(或)port-mapping对应一些地址空间。这些地址空间不是main memory的地址空间(可能掩盖了对应main memory空间，也可能和main memory的空间不重合)。当CPU访问这些地址时，root complex生成transaction requests，发给对应设备处理。对配置IO Port(0xCF8和0xCFC)的读写应该也由root complex处理生成配置请求。
 
+
+摘自PCIe Specification:
+
+- Root Complex:
+    - A defined System Element that includes at least one Host Bridge, Root Port (一个root complex可以包含多个host bridges); or Root Complex Integrated Endpoint (Root Complex可以直接集成到一个PCIe Endpoint设备内部).
+    - denotes the root of an I/O hierarchy that connects the CPU/memory subsystem to the I/O.
+    - may support one or more PCI Express Ports. Each interface defines a separate hierarchy domain. Each hierarchy domain may be composed of a single Endpoint or a sub-hierarchy containing one or more Switch components and Endpoints.
+    - must support generation of configuration requests as a Requester.
+    - is permitted to support the generation of I/O Requests as a Requester.
+- Host Bridge: Part of a Root Complex that connects a host CPU or CPUs to a Hierarchy. 一个root complex可以连接多个CPU；
+
 总结：
 
-- PCIe是一个point-to-point的网络，类似于以太网；switch也可类比以太网交换机；
-- Switch有多个port，其中一个是upstream port，其它是downstream port。每个port对应一个PCI-to-PCI bridge。PCI-to-PCI bridge有自己的type-1 configuration space；必须对所有upstream/downstream bridge进行program（设置它的configuration space），然后switch才能工作，为连接在它上面的下游PCI设备转发TLP memory packets。下游PCI设备可能是endpoint device，也可能是其它switch.
+- PCIe是一个point-to-point的网络(每个Endpoint和Root Complex之间的link是独立的)，类似于以太网；
+- Switch也可类比以太网交换机；有多个port，其中一个是upstream port，其它是downstream port。每个port对应一个PCI-to-PCI bridge。PCI-to-PCI bridge有自己的type-1 configuration space；必须对所有upstream/downstream bridge进行program（设置它的configuration space），然后switch才能工作，为连接在它上面的下游PCI设备转发TLP memory packets。下游PCI设备可能是endpoint device，也可能是其它switch.
 - Switch有内部bus，连接多个port；
 - 逻辑上看，和PCI总线结构是等价的；但point-to-point结构性能更好，因为bus是独占的，不需要arbitration.
 
