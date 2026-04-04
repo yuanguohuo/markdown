@@ -344,14 +344,21 @@ $$
 - 假如 $k=2$，事件 $A$ 发生的概率就是 $P(y=2 \mid \boldsymbol{x}_{\text{new}})$
 - 以此类推
 
-问 $k$ 取何值，能使 $P(y=k \mid \boldsymbol{x}\_{\text{new}})$ 最大？就预测 $\boldsymbol{x}\_{\text{new}}$ 属于类别 $k$；把它记为 $\hat{y}_{\text{new}}$，于是问题可形式化表示为：
+问 $k$ 取何值，能使 $P(y=k \mid \boldsymbol{x}\_{\text{new}})$ 最大？
+
+**后验概率**是贝叶斯统计中的一个概念，它是指在观察到数据 $\boldsymbol{x}_new$ 之后，某个类别 $y=k$ 成立的概率。
+
+所以，用数学语言来说，就是哪个$k$ 的后验概率最大？
+
+那个 $k$ 就是模型预测的 $\boldsymbol{x}\_{\text{new}}$ 的类别，记为 $\hat{y}_{\text{new}}$。
+
+于是，预测类别可表示成一个最大化问题：
 
 $$
 \hat{y}\_{\text{new}} = \underset{k \in {1, \dots, K}}{\arg\max} P(y = k \mid \boldsymbol{x}\_{\text{new}})
 $$
 
 > **说明**：$\arg\max$ 是 “argument of the maximum” 的缩写，表示**使函数取得最大值的自变量（或参数）的取值**。尽管在某些情况下可能存在多个最大化点（此时 $\arg\max$ 是一个集合），该符号仍采用单数形式 “argument” 命名，这是数学中的标准惯例。$\arg\min$ 同理，是 “argument of the minimum” 的缩写。
-
 
 根据贝叶斯公式:
 
@@ -426,10 +433,14 @@ P_{\boldsymbol{\theta}}(y=k) \cdot P_{\boldsymbol{\theta}}(\boldsymbol{x} \mid y
 \pi_k \cdot \mathcal{N}(\boldsymbol{x} \mid \boldsymbol{\mu}_k, \boldsymbol{\Sigma})
 $$
 
-其中 $\boldsymbol{\Sigma}$ 不依赖于类别 $k$，即所有类别共享同一个协方差矩阵。下表是详细对比。
+其中 $\boldsymbol{\Sigma}$ 不依赖于类别 $k$，即所有类别共享同一个协方差矩阵。下表是详细对比。其实共享的 $\boldsymbol{\Sigma}$ 就是所有类别的 $\boldsymbol{\Sigma}_k$ 的**加权平均**。
 
 ![figure1](lda-vs-gda.png)
 <div style="text-align: center;"><em>LDA与QDA对比</em></div>
+
+LDA中的L(Linear)是什么意思呢？采用相同的 $\boldsymbol{\Sigma}$ 时，各个类别的分界线是线性的。假如$\boldsymbol{x}$是二维的，即特征数是2，分界线就是平面坐标系上的直线。
+
+如果每个类有自己的 $\boldsymbol{\Sigma}_k$（即 QDA），那么决策边界会包含 $\boldsymbol{x}^\top \boldsymbol{\Sigma}_k^{-1} \boldsymbol{x}$ 这样的二次项，结果是椭圆、抛物线、双曲线等 曲线边界（假设 $\boldsymbol{x}$ 是二维的），故称 Quadratic（二次）判别分析。
 
 # 小结 (8)
 
