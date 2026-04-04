@@ -1,11 +1,17 @@
 ---
-title: 机器学习原理
+title: 机器学习原理-回归
 date: 2025-10-02 21:12:24
 tags: [llm,machine-learning]
 categories: llm
 ---
 
-机器学习原理入门。
+机器学习主要分为监督学习（Supervised Learning）、无监督学习（Unsupervised Learning）、强化学习（Reinforcement Learning）以及半监督学习（Semi-supervised Learning）等范式。
+
+监督学习主要包括两大类基础任务：回归（Regression）和分类（Classification）。回归用于预测连续值（输出为实数），分类则用于预测离散类别标签（输出为有限集合中的某个类别）。此外，结构化学习（Structured Learning）是一类更复杂的监督学习任务，其输出是具有内部结构的对象（如序列、树等），可视为分类或回归的高维扩展。
+
+在分类任务中，模型可分为生成式模型（Generative Models）和判别式模型（Discriminative Models）。生成式模型通过对联合分布 P(x,y) 建模来实现分类，典型方法包括高斯判别分析（GDA）及其两种常见形式——假设协方差矩阵共享的线性判别分析（LDA）和允许协方差矩阵独立的二次判别分析（QDA），以及朴素贝叶斯等。判别式模型则直接建模条件分布 P(y∣x)，代表方法有逻辑回归（Logistic Regression）、支持向量机（SVM）等。
+
+本文介绍回归认为的基础。
 
 <!-- more -->
 
@@ -20,7 +26,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 </script>
 
 
-# 问题描述 (1)
+# 问题设定 (1)
 
 现有一些HDD磁盘的性能数据(通过`iostat`采集)，如下所示：
 
