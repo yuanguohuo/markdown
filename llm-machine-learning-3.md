@@ -1,5 +1,5 @@
 ---
-title: 机器学习原理-分类
+title: 机器学习原理-分类(生成式)
 date: 2025-11-20 21:15:40
 tags: [llm,machine-learning]
 categories: llm
@@ -46,22 +46,36 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 
 # 核心思想 (2)
 
-假设训练样本按如下生成过程产生：
+假设训练样本由如下数据生成机制产生：
 
-1. 首先，从**类别先验分布** $P(y)$ 中随机选择一个类别 $y = k$，其中 $P(y = k)$ 表示类别 $k$ 出现的概率；
-2. 然后，在已知 $y = k$ 的条件下，从**类条件分布** $P(\boldsymbol{x} \mid y = k)$ 中生成特征向量 $\boldsymbol{x}$；
+- 所有类别 $1,2,\dots,K$ 符合某种概率分布 $P(y)$；按此分布，采样一个标签 $y=k$；
+- 类别 $k$ 内的特征（对象）符合某种概率分布 $P(\boldsymbol{x} \mid y = k)$；按此分布，生成一个特征 $\boldsymbol{x}$;
+- 以此类推，产生所有样本；
 
-因此，样本 $(\boldsymbol{x}, y = k)$ 被生成的联合概率为：
+因此，样本 $(\boldsymbol{x}, y)$ 被生成的联合概率为：
+
 $$
-P(\boldsymbol{x}, y = k) = P(y = k) \cdot P(\boldsymbol{x} \mid y = k).
+P(\boldsymbol{x}, y = k) = P(y = k) \cdot P(\boldsymbol{x} \mid y = k)
 $$
 
-> **说明**：$P(\boldsymbol{x} \mid y = k)$ 表示——在已经选定类别 $y=k$ 的前提下，从该类别中生成特征向量 $\boldsymbol{x}$ 的概率。换句话说，它刻画了类别 $k$ 内部样本的分布规律（下文将把这一分布建模为多元高斯分布）。
-
-实际上，训练样本来自于真实世界，并不是按上述方法生成的。但我们要构建真实世界的模型，手中只有这些训练数据。假如上述生成方式所产生的样本分布，与真实世界抽样得到的样本分布足够接近，我们就能据此反推真实世界的规律。把上述生成过程抽象成一个模型$P_{\text{model}}(\boldsymbol{x},y)$（类比回归问题中的模型——带未知参数的函数），只要这个模型联合分布足够接近真实世界的联合分布 $P_{\text{true}}(\boldsymbol{x},y)$，模型的预测也就可靠。正如 George E. P. Box 所言：
+实际上，训练样本来自于真实世界，并不是按上述方法生成的。但真实世界是一个黑箱机器，我们无法窥探其内部构造。所以，希望通过机器学习，构建真实世界的模型，即为黑箱机器构建一个模拟机器。假如模拟机器产生的样本分布，与真实世界抽样得到的样本分布足够接近，模型的预测也就是可靠的。正如 George E. P. Box 所言：
 > “All models are wrong, but some are useful.”
 
-如何使得模型中的 $P(y)$ 和 $P(\boldsymbol{x} \mid y=k)$ 足够接近真实世界的分布？或者更严格地说，我们如何通过有限的训练数据，学习一个生成模型 $P_{\text{model}}(y)$ 和 $P_{\text{model}}(\boldsymbol{x} \mid y)$ 使其尽可能逼近真实世界的分布 $P_{\text{true}}(y)$ 和 $P_{\text{true}}(\boldsymbol{x} \mid y)$？
+于是，把上述生成过程抽象成一个模型$P_{\text{model}}(\boldsymbol{x}, y)$（类比回归问题中的模型——带未知参数的函数）：
+
+$$
+P_{\text{model}}(\boldsymbol{x}, y = k) = P_{\text{model}}(y = k) \cdot P_{\text{model}}(\boldsymbol{x} \mid y = k)
+$$
+
+真实世界（黑箱机器）记做 $P_{\text{true}}(\boldsymbol{x}, y)$：
+
+$$
+P_{\text{true}}(\boldsymbol{x}, y = k) = P_{\text{true}}(y = k) \cdot P_{\text{true}}(\boldsymbol{x} \mid y = k)
+$$
+
+> **说明**：真实世界模型 $P_{\text{true}}(\boldsymbol{x})$ 可能根本不存在；它只是我们假想的目标。就像回归问题中，目标曲线不存在一样。只要Loss足够小，并且在validation和test集上表现足够好，就认为接近真实世界模型。
+
+如何通过有限的训练数据，学习一个生成模型 $P_{\text{model}}(y)$ 和 $P_{\text{model}}(\boldsymbol{x} \mid y)$ 使其尽可能逼近真实世界的分布 $P_{\text{true}}(y)$ 和 $P_{\text{true}}(\boldsymbol{x} \mid y)$？
 
 高斯判别分析（Gaussian Discriminant Analysis, GDA）提供了一种具体解决方案。
 
@@ -76,7 +90,8 @@ $$
 
 GDA 模型定义如下：
 
-- **类别先验** $P_{\text{model}}(y)$ 服从多项分布：
+- 类别先验 $P_{\text{model}}(y)$ ：
+
   $$
   P(y = k) = \pi_k, \quad \text{其中 } \pi_k \geq 0,\ \sum_{k=1}^{K} \pi_k = 1.
   $$
@@ -98,6 +113,12 @@ GDA 模型定义如下：
   是多元高斯分布的**概率密度函数（PDF）**。
 
 > **说明**：$\pi$ 是圆周率，和各类别的先验概率 $\pi_k$ 没有关系；$d$ 是特征的个数，也就是特征向量$\boldsymbol{x}$的维数。
+> **说明**：**先验概率** $P(y=k)$ 是在观测到任何数据（即特征 $x$）之前，对类别 $k$ 出现的**概率信念**。它反映了类别在总体中的**固有频率或主观先验知识**。
+> - 频率学派视角（客观解释）：
+>     - 先验概率 $\pi_k$ 被估计为类别 $k$ 在训练数据中的经验频率：$\pi_k = \frac{N_k}{N}$；
+>     - 在 GDA 中，若采用最大似然估计（MLE），该估计值正是 $\pi_k$ 的最优解（$\pi_k = \frac{N_k}{N}$ 不是人为设定，而是 MLE 求解得到的）；
+> - 贝叶斯学派视角（主观解释）：
+>     - 先验概率可以来自领域知识、历史经验或专家判断，不一定依赖当前数据。
 
 类比回归问题中的模型（带未知参数的函数），GDA 模型中也包含一组**待学习的未知参数**，具体包括：
 
@@ -112,7 +133,7 @@ $$
 \boldsymbol{\theta} = ( \pi_1, \dots, \pi_K; \boldsymbol{\mu}_1, \dots, \boldsymbol{\mu}_K; \boldsymbol{\Sigma}_1, \dots, \boldsymbol{\Sigma}_K )
 $$
 
-引入参数集$\boldsymbol{\theta}$之后，我们把模型正式记做：$P_{\boldsymbol{\theta}}(\boldsymbol{x}, y)$；表示 $P_{\boldsymbol{\theta}}(y) \cdot P_{\boldsymbol{\theta}}(\boldsymbol{x} \mid y)$；
+引入参数集$\boldsymbol{\theta}$之后，我们把模型正式记做：$P_{\boldsymbol{\theta}}(\boldsymbol{x}, y) = P_{\boldsymbol{\theta}}(y) \cdot P_{\boldsymbol{\theta}}(\boldsymbol{x} \mid y)$；
 
 接下来的任务就是从训练数据中学习 $\boldsymbol{\theta}$，使得模型 $P_{\boldsymbol{\theta}}(\boldsymbol{x}, y)$ 最大程度地“解释”观测样本 $(\boldsymbol{x}_i, y_i)$，逼近真实数据分布。
 
@@ -438,9 +459,253 @@ $$
 ![figure1](lda-vs-gda.png)
 <div style="text-align: center;"><em>LDA与QDA对比</em></div>
 
-LDA中的L(Linear)是什么意思呢？采用相同的 $\boldsymbol{\Sigma}$ 时，各个类别的分界线是线性的。假如$\boldsymbol{x}$是二维的，即特征数是2，分界线就是平面坐标系上的直线。
+LDA中的L(Linear)是什么意思呢？
 
-如果每个类有自己的 $\boldsymbol{\Sigma}_k$（即 QDA），那么决策边界会包含 $\boldsymbol{x}^\top \boldsymbol{\Sigma}_k^{-1} \boldsymbol{x}$ 这样的二次项，结果是椭圆、抛物线、双曲线等 曲线边界（假设 $\boldsymbol{x}$ 是二维的），故称 Quadratic（二次）判别分析。
+## 二分类 (7.1)
+
+二分类场景，即 $y$ 只有 1 和 2 两个取值。上文已经算出它们的先验概率是 $\pi_1$ 和 $\pi_2$，各类高斯分布的的**均值向量**（Mean vector）分别是 $\boldsymbol{\mu}_1$ 和 $\boldsymbol{\mu}_2$，**协方差矩阵** 是 $\Sigma$ （LDA模型中，各类别的协方差矩阵相同）。
+
+根据贝叶斯公式，类别1（$y=1$）的后验概率：
+
+$$
+P(y=1 \mid \boldsymbol{x}) = \frac{P(y=1) P(\boldsymbol{x} \mid y=1)}{P(\boldsymbol{x})}
+$$
+
+根据全概率公式：
+
+$$
+P(\boldsymbol{x}) = P(y=1)P(\boldsymbol{x} \mid y=1) + P(y=2)P(\boldsymbol{x} \mid y=2)
+$$
+
+所以:
+
+$$
+P(y=1 \mid \boldsymbol{x}) = \frac{P(y=1) P(\boldsymbol{x} \mid y=1)}{P(y=1)P(\boldsymbol{x} \mid y=1) + P(y=2)P(\boldsymbol{x} \mid y=2)}
+$$
+
+分子分母同除以$P(y=1) P(\boldsymbol{x} \mid y=1)$ （不为0）：
+
+$$
+P(y=1 \mid \boldsymbol{x}) = \frac{1}{1 + \frac{P(y=2)P(\boldsymbol{x} \mid y=2)}{P(y=1) P(\boldsymbol{x} \mid y=1)}}
+$$
+
+把它变成sigmoid的形式：
+
+$$
+P(y=1 \mid \boldsymbol{x}) = \frac{1}{1 + e^{-z}} = \sigma(z)
+$$
+
+其中
+
+$$
+-z = \ln \frac{P(y=2)P(\boldsymbol{x} \mid y=2)}{P(y=1) P(\boldsymbol{x} \mid y=1)}
+$$
+
+即
+
+$$
+z = \ln \frac{P(y=1) P(\boldsymbol{x} \mid y=1)}{P(y=2)P(\boldsymbol{x} \mid y=2)}
+$$
+
+乘法变加法：
+
+$$
+z = \ln \frac{P(y=1)}{P(y=2)} + \ln \frac{P(\boldsymbol{x} \mid y=1)}{P(\boldsymbol{x} \mid y=2)}
+$$
+
+代入已知先验概率：
+
+$$
+z = \ln \frac{P(\boldsymbol{x} \mid y=1)}{P(\boldsymbol{x} \mid y=2)} + \ln \frac{\pi_1}{\pi_2}
+$$
+
+代入多元高斯分布：
+
+$$
+z = \ln \frac{\mathcal{N}(\boldsymbol{x} \mid \boldsymbol{\mu}_1, \boldsymbol{\Sigma})}{\mathcal{N}(\boldsymbol{x} \mid \boldsymbol{\mu}_2, \boldsymbol{\Sigma})} + \ln \frac{\pi_1}{\pi_2}
+$$
+
+注意：
+
+$$
+\mathcal{N}(\boldsymbol{x} \mid \boldsymbol{\mu}_k, \boldsymbol{\Sigma}) =
+\frac{1}{(2\pi)^{d/2} |\boldsymbol{\Sigma}|^{1/2}}
+\exp\left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_k)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_k) \right)
+$$
+
+前半部分约分：
+
+$$
+z = \ln \frac{\exp\left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_1)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_1) \right)}{\exp\left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_2)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_2) \right)} + \ln \frac{\pi_1}{\pi_2}
+$$
+
+除法变减法：
+
+$$
+z = \ln \exp\left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_1)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_1) \right)  - \ln \exp\left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_2)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_2) \right) + \ln \frac{\pi_1}{\pi_2}
+$$
+
+即
+
+$$
+z = \left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_1)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_1) \right) - \left( -\frac{1}{2} (\boldsymbol{x} - \boldsymbol{\mu}_2)^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}_2) \right) + \ln \frac{\pi_1}{\pi_2}
+$$
+
+
+其中
+
+$$
+(\boldsymbol{x} - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}) =
+\boldsymbol{x}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - \boldsymbol{x}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu} - \boldsymbol{\mu}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} + \boldsymbol{\mu}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}
+$$
+
+因为 $\boldsymbol{\Sigma}$ 是对称矩阵，所以 $\boldsymbol{\Sigma}^{-1}$ 也是对称矩阵；所以 $\boldsymbol{a}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{b} = \boldsymbol{b}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{a}$ 成立（$\boldsymbol{a}$和$\boldsymbol{b}$是向量）。所以 $\boldsymbol{x}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu} = \boldsymbol{\mu}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x}$。所以：
+
+$$
+(\boldsymbol{x} - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\boldsymbol{x} - \boldsymbol{\mu}) =
+\boldsymbol{x}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - 2 \boldsymbol{\mu}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} + \boldsymbol{\mu}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}
+$$
+
+代入$z$：
+
+$$
+z = \left( -\frac{1}{2} \boldsymbol{x}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} + \boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - \frac{1}{2} \boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_1 \right) - \left( -\frac{1}{2} \boldsymbol{x}^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} + \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - \frac{1}{2} \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_2 \right) + \ln \frac{\pi_1}{\pi_2}
+$$
+
+合并化简，得到：
+
+$$
+z = \boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - \frac{1}{2}(\boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_1 - \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_2) + \ln \frac{\pi_1}{\pi_2}
+$$
+
+整理，得到：
+
+$$
+z = (\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2)^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{x} - \frac{1}{2}(\boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_1 - \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_2) + \ln \frac{\pi_1}{\pi_2}
+$$
+
+因为 $\boldsymbol{\Sigma}^{-1}$ 是对称矩阵，所以 $(\boldsymbol{\Sigma}^{-1})^\top = \boldsymbol{\Sigma}^{-1}$。又因为 $(AB)^\top = B^\top A^\top$。所以，
+
+$$
+(\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2)^\top \boldsymbol{\Sigma}^{-1} = (\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2)^\top (\boldsymbol{\Sigma}^{-1})^\top = \left( \boldsymbol{\Sigma}^{-1} (\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2) \right)^\top
+$$
+
+最终，
+
+$$
+z = \left( \boldsymbol{\Sigma}^{-1} (\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2) \right)^\top \boldsymbol{x} - \frac{1}{2}(\boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_1 - \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_2) + \ln \frac{\pi_1}{\pi_2}
+$$
+
+所以 $z$ 可表示为：
+
+$$
+z = \boldsymbol{w}^\top \boldsymbol{x} + b
+$$
+
+其中，
+
+$$
+\begin{aligned}
+& \boldsymbol{w} = \boldsymbol{\Sigma}^{-1} (\boldsymbol{\mu}_1 - \boldsymbol{\mu}_2) \\\\
+& b = - \frac{1}{2}(\boldsymbol{\mu}_1^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_1 - \boldsymbol{\mu}_2^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_2) + \ln \frac{\pi_1}{\pi_2}
+\end{aligned}
+$$
+
+这里 $\boldsymbol{w}$ 是一个向量，$b$ 是一个标量。因为 $\pi_1$、$\pi_2$、$\boldsymbol{\mu}_1$、$\boldsymbol{\mu}_2$ 和 $\boldsymbol{\Sigma}^{-1}$ 均已经通过训练数据估计得到，所以 $\boldsymbol{w}$ 和 $b$ 是确定的。
+
+由 $z$ 的形式可见，LDA 的**线性**（Linear）正源于此：判别函数是输入 $\boldsymbol{x}$ 的线性函数。在二分类场景下，后验概率为 $P(y=1 \mid \boldsymbol{x}) = \sigma(z)$。当 $z \geq 0.5$ 时，$\sigma(z) \geq 0.5$，模型将 $\boldsymbol{x}$ 判为类别1；否则判为类别2。
+
+![figure2](sigmoid-and-boundary.png)
+<div style="text-align: center;"><em>sigmoid和类别分界线</em></div>
+
+假如 $\boldsymbol{x}$ 仅有两个分量 $x_1$ 和 $x_2$，则决策边界 $z=0$ 对应平面上的一条直线。例如，由 $\pi_1$、$\pi_2$、$\boldsymbol{\mu}_1$、$\boldsymbol{\mu}_2$ 和 $\boldsymbol{\Sigma}^{-1}$  计算得：
+
+$$
+\begin{aligned}
+& \boldsymbol{w}^\top = (20,5)  \\\\
+& b = -50
+\end{aligned}
+$$
+
+则决策边界为直线 $20x_1 + 5x_2 - 50 = 0$（如上图所示）。
+
+推广到高维空间：
+
+- 当 $d=3$ 时，决策边界是一个平面；
+- 当 $d>3$ 时，决策边界是一个 $d-1$ 维的超平面（hyperplane）；
+
+由于该边界由线性方程 $\boldsymbol{w}^\top \boldsymbol{x} + b$ 定义，故称为“线性判别”，**这就是 Linear Discriminant Analysis 名称的由来**。如果每个类有自己的 $\boldsymbol{\Sigma}_k$（即 QDA），那么决策边界会包含 $\boldsymbol{x}^\top \boldsymbol{\Sigma}_k^{-1} \boldsymbol{x}$ 这样的二次项，结果是椭圆、抛物线、双曲线等 曲线边界（假设 $\boldsymbol{x}$ 是二维的），故称 Quadratic（二次）判别分析。
+
+## 多分类 (7.2)
+
+由上一节可知，在二分类场景下，特征向量 $\boldsymbol{x}$ 对某一类别的后验概率可表示为 $\sigma(\text{关于 }\boldsymbol{x}\text{ 的线性组合})$。这实际上是多分类情形的一个特例。
+
+在多分类场景下，特征向量 $\boldsymbol{x}$ 对类别 $k$ 的后验概率为：
+
+$$
+P(y = k \mid \boldsymbol{x}) = \frac{e^{\boldsymbol{w}_k^\top \boldsymbol{x} + b_k}}{\sum_{j=1}^K e^{\boldsymbol{w}_j^\top \boldsymbol{x} + b_j}}
+$$
+
+省略推导过程（其推导思路与二分类情形类似，均基于高斯假设和贝叶斯定理）。这实际上就是 **softmax 函数** 的形式。
+
+函数 $\operatorname{softmax}$ 的一般定义如下：  
+
+给定一个实数向量 $\boldsymbol{z} = (z_1, z_2, \dots, z_K)^\top \in \mathbb{R}^K$，$\operatorname{softmax}$ 将其归一化为一个由 $K$ 个概率组成的概率分布，其中每个概率与对应输入分量的指数成正比。也就是说，在应用 $\operatorname{softmax}$ 之前，向量分量可能为负数、大于 1，且总和不一定为 1；但应用之后，每个分量都落在区间 $(0,1)$ 内，且所有分量之和等于 1，因此可被解释为概率。此外，较大的输入分量将对应较大的输出概率。
+
+其数学形式为：
+
+$$
+\operatorname{softmax}(\boldsymbol{z})_k = \frac{e^{z_k}}{\sum_{j=1}^K e^{z_j}}, \quad \text{for } k = 1, 2, \dots, K.
+$$
+
+引入 $\operatorname{softmax}$ 后，特征向量 $\boldsymbol{x}$ 对类别 $k$ 的后验概率可简洁地表示为：
+
+$$
+P(y = k \mid \boldsymbol{x}) = \operatorname{softmax}(\boldsymbol{z})_k,
+$$
+
+其中，
+
+$$
+z_k = \boldsymbol{w}_k^\top \boldsymbol{x} + b_k,
+$$
+
+并且在 LDA 框架下，参数由下式给出：
+
+$$
+\begin{aligned}
+& \boldsymbol{w}_k = \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_k \\\\
+& b_k = -\frac{1}{2} \boldsymbol{\mu}_k^\top \boldsymbol{\Sigma}^{-1} \boldsymbol{\mu}_k + \ln \pi_k.
+\end{aligned}
+$$
+
+可以验证，当 $K=2$ 时，$P(y=1 \mid \boldsymbol{x})$ 退化为 $\sigma(z)$ 形式，且其中 $z$、$\boldsymbol{w}$ 和 $b$ 完全同7.1节。
+
+**注意**：在二分类场景中，只需计算类别 $k=1$ 的后验概率 $P(y=1 \mid \boldsymbol{x}) = \sigma(z)$，而类别 $k=2$ 的后验概率自然为 $P(y=2 \mid \boldsymbol{x}) = 1 − \sigma(z) = \sigma(-z)$ （容易推导），自动满足归一化条件。在多分类场景中，$\operatorname{softmax}(\boldsymbol{z})$ 输出一个 $K$ 维概率向量，其第 $k$ 个分量 $\operatorname{softmax}(\boldsymbol{z})_k$ 即为类别 $k$ 的后验概率 $P(y = k \mid \boldsymbol{x})$。所以，整体可以写成向量形式：
+
+$$
+P(y \mid \boldsymbol{x}) = \operatorname{softmax}(\boldsymbol{W}\boldsymbol{x} + \boldsymbol{b})
+$$
+
+其中：
+
+- $\boldsymbol{x} \in \mathbb{R}^d$：输入特征向量（$d$维）
+- $\boldsymbol{W} \in \mathbb{R}^{K \times d}$：权重矩阵，第 $k$ 行是 $\boldsymbol{w}_k^\top$
+- $\boldsymbol{b} \in \mathbb{R}^K$：偏置向量，第 $k$ 个元素为 $b_k$
+
+故，
+
+$$
+\boldsymbol{z} =
+\boldsymbol{W}\boldsymbol{x} + \boldsymbol{b} = \begin{bmatrix}
+\boldsymbol{w}_1^\top \boldsymbol{x} + b_1 \\\\
+\boldsymbol{w}_1^\top \boldsymbol{x} + b_2 \\\\
+\vdots                                     \\\\
+\boldsymbol{w}_K^\top \boldsymbol{x} + b_K
+\end{bmatrix} \in \mathbb{R}^K
+$$
+
+- $\operatorname{softmax}(\boldsymbol{z}) \in \mathbb{R}^K$ 输出为类别后验概率分布。
 
 # 小结 (8)
 
