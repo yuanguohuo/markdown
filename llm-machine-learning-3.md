@@ -116,7 +116,7 @@ GDA 模型定义如下：
 > **说明**：**先验概率** $P(y=k)$ 是在观测到任何数据（即特征 $x$）之前，对类别 $k$ 出现的**概率信念**。它反映了类别在总体中的**固有频率或主观先验知识**。
 > - 频率学派视角（客观解释）：
 >     - 先验概率 $\pi_k$ 被估计为类别 $k$ 在训练数据中的经验频率：$\pi_k = \frac{N_k}{N}$；
->     - 在 GDA 中，若采用最大似然估计（MLE），该估计值正是 $\pi_k$ 的最优解（$\pi_k = \frac{N_k}{N}$ 不是人为设定，而是 MLE 求解得到的）；
+>     - 在 GDA 中，若采用最大似然估计（MLE, Maximum Likelihood Estimation），该估计值正是 $\pi_k$ 的最优解（$\pi_k = \frac{N_k}{N}$ 不是人为设定，而是 MLE 求解得到的）；
 > - 贝叶斯学派视角（主观解释）：
 >     - 先验概率可以来自领域知识、历史经验或专家判断，不一定依赖当前数据。
 
@@ -169,7 +169,7 @@ $$
 
 # 最大似然估计 (4)
 
-回归问题通常通过梯度下降等数值优化方法求解参数；而 GDA 因其良好的概率结构，可通过**最大似然估计**（Maximum Likelihood Estimation, MLE）获得**解析解**。
+回归问题通常通过梯度下降等数值优化方法求解参数；而 GDA 因其良好的概率结构，可通过**最大似然估计**（Maximum Likelihood Estimation, MLE）获得**解析解**。**最大似然估计，就是最大化似然函数**。
 
 **真实世界是一台黑箱机器，即不能确切知道** $P_{\text{true}}(\boldsymbol{x},y)$. **我们造了一台机器模拟它，若希望模拟得足够像，自然是希望它的产品与真实产品足够相似（分布相似）。这正是生成建模（generative modeling）的核心思想。**
 
@@ -489,19 +489,19 @@ $$
 P(y=1 \mid \boldsymbol{x}) = \frac{1}{1 + \frac{P(y=2)P(\boldsymbol{x} \mid y=2)}{P(y=1) P(\boldsymbol{x} \mid y=1)}}
 $$
 
-把它变成sigmoid的形式：
-
-$$
-P(y=1 \mid \boldsymbol{x}) = \frac{1}{1 + e^{-z}} = \sigma(z)
-$$
-
-其中
+令，
 
 $$
 -z = \ln \frac{P(y=2)P(\boldsymbol{x} \mid y=2)}{P(y=1) P(\boldsymbol{x} \mid y=1)}
 $$
 
-即
+原式变形为：
+
+$$
+P(y=1 \mid \boldsymbol{x}) = \frac{1}{1 + e^{-z}}
+$$
+
+这正是sigmoid函数。根据对数性质，$z$ 可变形为：
 
 $$
 z = \ln \frac{P(y=1) P(\boldsymbol{x} \mid y=1)}{P(y=2)P(\boldsymbol{x} \mid y=2)}
@@ -681,10 +681,24 @@ $$
 
 可以验证，当 $K=2$ 时，$P(y=1 \mid \boldsymbol{x})$ 退化为 $\sigma(z)$ 形式，且其中 $z$、$\boldsymbol{w}$ 和 $b$ 完全同7.1节。
 
-**注意**：在二分类场景中，只需计算类别 $k=1$ 的后验概率 $P(y=1 \mid \boldsymbol{x}) = \sigma(z)$，而类别 $k=2$ 的后验概率自然为 $P(y=2 \mid \boldsymbol{x}) = 1 − \sigma(z) = \sigma(-z)$ （容易推导），自动满足归一化条件。在多分类场景中，$\operatorname{softmax}(\boldsymbol{z})$ 输出一个 $K$ 维概率向量，其第 $k$ 个分量 $\operatorname{softmax}(\boldsymbol{z})_k$ 即为类别 $k$ 的后验概率 $P(y = k \mid \boldsymbol{x})$。所以，整体可以写成向量形式：
+**注意**：在二分类场景中，只需计算类别 $k=1$ 的后验概率 $P(y=1 \mid \boldsymbol{x}) = \sigma(z)$，而类别 $k=2$ 的后验概率自然为 $P(y=2 \mid \boldsymbol{x}) = 1 − \sigma(z) = \sigma(-z)$ （容易推导），自动满足归一化条件。
+
+在多分类场景中，$\operatorname{softmax}(\boldsymbol{z})$ 输出一个 $K$ 维概率向量，其第 $k$ 个分量 $\operatorname{softmax}(\boldsymbol{z})_k$ 即为类别 $k$ 的后验概率 $P(y = k \mid \boldsymbol{x})$。所以，整体可以写成向量形式：
 
 $$
-P(y \mid \boldsymbol{x}) = \operatorname{softmax}(\boldsymbol{W}\boldsymbol{x} + \boldsymbol{b})
+P(y \mid \boldsymbol{x}) = \operatorname{softmax}(\boldsymbol{W}\boldsymbol{x} + \boldsymbol{b}),
+$$
+
+其中**线性得分（logit）**向量 $\boldsymbol{z}$ 定义为：
+
+$$
+\boldsymbol{z} =
+\boldsymbol{W}\boldsymbol{x} + \boldsymbol{b} = \begin{bmatrix}
+\boldsymbol{w}_1^\top \boldsymbol{x} + b_1 \\\\
+\boldsymbol{w}_2^\top \boldsymbol{x} + b_2 \\\\
+\vdots                                     \\\\
+\boldsymbol{w}_K^\top \boldsymbol{x} + b_K
+\end{bmatrix} \in \mathbb{R}^K
 $$
 
 其中：
@@ -692,19 +706,7 @@ $$
 - $\boldsymbol{x} \in \mathbb{R}^d$：输入特征向量（$d$维）
 - $\boldsymbol{W} \in \mathbb{R}^{K \times d}$：权重矩阵，第 $k$ 行是 $\boldsymbol{w}_k^\top$
 - $\boldsymbol{b} \in \mathbb{R}^K$：偏置向量，第 $k$ 个元素为 $b_k$
-
-故，
-
-$$
-\boldsymbol{z} =
-\boldsymbol{W}\boldsymbol{x} + \boldsymbol{b} = \begin{bmatrix}
-\boldsymbol{w}_1^\top \boldsymbol{x} + b_1 \\\\
-\boldsymbol{w}_1^\top \boldsymbol{x} + b_2 \\\\
-\vdots                                     \\\\
-\boldsymbol{w}_K^\top \boldsymbol{x} + b_K
-\end{bmatrix} \in \mathbb{R}^K
-$$
-
+- $\boldsymbol{z} \in \mathbb{R}^K$：线性得分向量，第 $k$ 个元素为类别 $y=k$ 的线性得分（叫做logit）。
 - $\operatorname{softmax}(\boldsymbol{z}) \in \mathbb{R}^K$ 输出为类别后验概率分布。
 
 # 小结 (8)
