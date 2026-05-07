@@ -139,11 +139,13 @@ $$
 
 在继续之前，需明确 $P_{\boldsymbol{\theta}}(\boldsymbol{x} \mid y = k)$ 的含义。
 
-这是一个**条件概率密度函数**（conditional probability density function），其一般形式为 $P(A \mid B)$，表示在事件 $B$ 已经发生的前提下，事件 $A$ 发生的条件概率。
+条件概率 $P(A \mid B)$ 表示在事件 $B$ 已经发生的前提下，事件 $A$ 发生的概率。
+
+在机器学习中常沿用记号 $P(\boldsymbol{x} \mid y = k)$ 来表示**条件概率密度**，尽管严格来说它不是一个概率，而是一个密度函数。
 
 在当前上下文中：
 - 事件 $B$：类别被选定为 $y = k$；
-- 事件 $A$：生成的样本落入 $\boldsymbol{x}$ 的无穷小邻域内。注意：并非“生成确切的 $\boldsymbol{x}$”
+- 事件 $A$：生成的样本落入 $\boldsymbol{x}$ 的一个微小但有限的邻域内。注意：并非“生成确切的 $\boldsymbol{x}$”
 
 需要特别注意：由于 $\boldsymbol{x} \in \mathbb{R}^d$ 是连续型随机向量，其取任意特定值的概率严格为零，即
 
