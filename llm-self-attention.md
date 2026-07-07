@@ -24,7 +24,7 @@ tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
 
 假设当前上下文是“humpty dumpty sat on”，我们要预测下一个单词。有以下输入：
 
-## Eembedding矩阵 (1.1)
+## Embedding矩阵 (1.1)
 
 假设每个单词的embedding向量是512维，并且假设：
 
@@ -124,7 +124,7 @@ E_1W^K = \begin{bmatrix}
 $$
 
 
-- "humpty"的Key向量：$V_{humpty}$
+- "humpty"的Value向量：$V_{humpty}$
 
 $$
 E_1W^V = \begin{bmatrix}

@@ -194,11 +194,11 @@ KL 散度（Kullback-Leibler Divergence）是衡量**两个概率分布差异**�
 
 > **如果你以为数据服从分布 $Q$，但实际上它服从分布 $P$，那么当你用 $Q$ 来设计编码方案（如 Huffman 编码）时，平均会多花多少“信息量”？**
 
-这个额外的**平均比特数（或纳特数）**，就是 $KL(P \mid \mid Q)$。
+这个额外的**平均比特数（或纳特数）**，就是 $KL(P \mid\mid Q)$。
 
 > 注意：KL 散度 不是距离，因为它：
-> - **不对称**：$KL(P \mid \mid Q) \neq KL(Q \mid \mid P)$
-> - **不满足三角不等式**：即存在分布 $P$, $Q$, $R$，使得 $KL(P \mid \mid R) \gt  KL(P \mid \mid Q) + KL(Q \mid \mid R)$
+> - **不对称**：$KL(P \mid\mid Q) \neq KL(Q \mid\mid P)$
+> - **不满足三角不等式**：即存在分布 $P$, $Q$, $R$，使得 $KL(P \mid\mid R) \gt  KL(P \mid\mid Q) + KL(Q \mid\mid R)$
 
 因此，KL 散度被称为散度（divergence），而非度量（metric）。
 
@@ -219,19 +219,19 @@ KL 散度就是这种“编码效率损失”的平均值。
 则 KL 散度定义为：
 
 $$
-KL(P \mid \mid Q) = \sum_{x} P(x) \log \frac{P(x)}{Q(x)}
+KL(P \mid\mid Q) = \sum_{x} P(x) \log \frac{P(x)}{Q(x)}
 $$
 
 这里做一个直观分析（“惩罚”表示让 KL 变大；“收益”表示在 KL 上加一个负值，使它变小）：
 
-- 支撑缺失 → 无穷惩罚：若存在某个 $x$ 使得 $P(x) > 0$ 但 $Q(x) = 0$，则 $KL(P \mid \mid Q) = +\infty$。这意味着模型完全无法描述真实世界中可能出现的符号——编码失败！
-- 完美匹配 → 零代价：当 $Q = P$ 时，$KL(P \mid \mid Q) = 0$，即使用真实分布编码，达到信息论最优。
+- 支撑缺失 → 无穷惩罚：若存在某个 $x$ 使得 $P(x) > 0$ 但 $Q(x) = 0$，则 $KL(P \mid\mid Q) = +\infty$。这意味着模型完全无法描述真实世界中可能出现的符号——编码失败！
+- 完美匹配 → 零代价：当 $Q = P$ 时，$KL(P \mid\mid Q) = 0$，即使用真实分布编码，达到信息论最优。
 - 低估高频 → 严重惩罚：当 $Q(x) \ll P(x)$（即低估了高频符号的概率），惩罚非常严重。因为 $\log \frac{P(x)}{Q(x)}$ 很大，且权重 $P(x)$ 也很大，乘积项成为一个显著的正数。
 - 高估低频 → 收益很轻：
     - 若 $x$ 是低频符号（$P(x) \approx 0$），则尽管 $\log \frac{P(x)}{Q(x)} \to -\infty$，但加权后 $P(x) \log \frac{P(x)}{Q(x)} \to 0$；
     - 即使 $P(x)$ 不太小（如 0.2 或 0.4），注意到 $P(x) < Q(x) \leq 1$，比值 $\frac{P(x)}{Q(x)}$ 不会极端小，因此 $\log \frac{P(x)}{Q(x)}$ 的绝对值有限，收益也有限。
     - **更重要的是**：概率分布必须满足 $\sum_x Q(x) = 1$。在一个符号上高估 $Q(x)$，必然导致其他符号的 $Q$ 值被压低。而那些被压低的符号中，往往包含真实高频符号（$P$ 大），从而产生强烈的正惩罚项，足以抵消甚至远超此处的微弱收益。
-- 正负项能抵消吗？例如，$P \neq Q$，但 KL 恰好为 0？**不可能**。只要 $P \neq Q$，就有 $KL(P \mid \mid Q) > 0$ —— 这是信息论的基本定理，称为 Gibbs 不等式。直观理解：
+- 正负项能抵消吗？例如，$P \neq Q$，但 KL 恰好为 0？**不可能**。只要 $P \neq Q$，就有 $KL(P \mid\mid Q) > 0$ —— 这是信息论的基本定理，称为 Gibbs 不等式。直观理解：
     - 低估高频符号 → “重权 × 大正值” = 大惩罚；
     - 高估低频符号 → “轻权 × 负值” = 小收益（即使对数绝对值大，乘以小权重后整体趋近于 0）；
     - 总和恒为正，无法抵消。
@@ -250,7 +250,7 @@ $$
 - 当 bin 越分越细（$\Delta \to 0$），该冗余趋近于：
 
 $$
-KL(P \mid \mid Q) = \int_{-\infty}^{\infty} p(x) \log \frac{p(x)}{q(x)} dx
+KL(P \mid\mid Q) = \int_{-\infty}^{\infty} p(x) \log \frac{p(x)}{q(x)} dx
 $$
 
 这就是连续 KL 散度——它衡量的是：在无限精细的量化下，因误用密度模型 $q$ 而导致的平均信息损失。
@@ -287,7 +287,7 @@ $$
 在此基础上，Jensen-Shannon 散度（JS 散度）定义为：
 
 $$
-JS(P \mid \mid Q) = \frac{1}{2} KL(P \mid \mid M) + \frac{1}{2} KL(Q \mid \mid M)
+JS(P \mid\mid Q) = \frac{1}{2} KL(P \mid\mid M) + \frac{1}{2} KL(Q \mid\mid M)
 $$
 
 > 直观理解：
@@ -295,17 +295,17 @@ $$
 > JS 散度衡量的是——两个分布 $P$ 和 $Q$ 分别相对于它们的“中间分布” M 的平均编码冗余。
 >
 > 换句话说：如果不知道数据来自 $P$ 还是 $Q$（各占一半可能），于是用混合模型 $M$ 来统一编码，那么：
-> 
-> - 当真实分布是 $P$ 时，平均多花 $KL(P \mid \mid M)$ 比特；
-> - 当真实分布是 $Q$ 时，平均多花 $KL(Q \mid \mid M)$ 比特；
+>
+> - 当真实分布是 $P$ 时，平均多花 $KL(P \mid\mid M)$ 比特；
+> - 当真实分布是 $Q$ 时，平均多花 $KL(Q \mid\mid M)$ 比特；
 > - JS 散度就是这两种情况的平均额外代价。
 
 JS 散度有以下性质：
 
-- **对称性**：$JS(P \mid \mid Q) = JS(Q \mid \mid P)$；KL 散度不满足。
-- **零值条件**：$JS(P \mid \mid Q) = 0 \iff P = Q$；KL 散度也满足此性质。
-- **是否为距离**：JS 散度本身不是距离，但 $\sqrt{JS(P \mid \mid Q)}$ 是一个度量（满足非负性、对称性、同一性与三角不等式）；KL 散度不满足三角不等式。
-- **有界性**：$0 \leq JS(P \mid \mid Q) \leq \log 2$；具体上界取决于对数底数：
+- **对称性**：$JS(P \mid\mid Q) = JS(Q \mid\mid P)$；KL 散度不满足。
+- **零值条件**：$JS(P \mid\mid Q) = 0 \iff P = Q$；KL 散度也满足此性质。
+- **是否为距离**：JS 散度本身不是距离，但 $\sqrt{JS(P \mid\mid Q)}$ 是一个度量（满足非负性、对称性、同一性与三角不等式）；KL 散度不满足三角不等式。
+- **有界性**：$0 \leq JS(P \mid\mid Q) \leq \log 2$；具体上界取决于对数底数：
     - 若使用自然对数，则上界为 $\ln 2 \approx 0.693$（单位：纳特）；
     - 若使用以 $2$ 为底的对数，则上界为 $1$（单位：比特）；
 
@@ -314,8 +314,8 @@ JS 散度有以下性质：
 - 当 $Q = P$ 时，混合分布 $M = \frac{1}{2} P + \frac{1}{2} Q = P = Q$，故
 
 $$
-JS(P \mid \mid Q) = \frac{1}{2} KL(P \mid \mid P) + \frac{1}{2} KL(Q \mid \mid Q) = 0
-$$ 
+JS(P \mid\mid Q) = \frac{1}{2} KL(P \mid\mid P) + \frac{1}{2} KL(Q \mid\mid Q) = 0
+$$
 
 - 当 $P$ 与 $Q$ 支撑集完全不相交时，例如在字符集 {a,b,c,d} 上，
 
@@ -333,15 +333,15 @@ $$
 
 $$
 \begin{aligned}
-& KL(P \mid \mid M) = \sum_x P(x) \log \frac{P(x)}{M(x)} = 0 + 0 + 0.5 \log \frac{0.5}{0.25} + 0.5 \log \frac{0.5}{0.25} = \log 2 \\\\
-& KL(Q \mid \mid M) = \sum_x Q(x) \log \frac{Q(x)}{M(x)} = 0.5 \log \frac{0.5}{0.25} + 0.5 \log \frac{0.5}{0.25} + 0 + 0 = \log 2
+& KL(P \mid\mid M) = \sum_x P(x) \log \frac{P(x)}{M(x)} = 0 + 0 + 0.5 \log \frac{0.5}{0.25} + 0.5 \log \frac{0.5}{0.25} = \log 2 \\\\
+& KL(Q \mid\mid M) = \sum_x Q(x) \log \frac{Q(x)}{M(x)} = 0.5 \log \frac{0.5}{0.25} + 0.5 \log \frac{0.5}{0.25} + 0 + 0 = \log 2
 \end{aligned}
 $$
 
 因此，
 
 $$
-JS(P \mid \mid Q) = \frac{1}{2} KL(P \mid \mid M) + \frac{1}{2} KL(Q \mid \mid M) = \log 2
+JS(P \mid\mid Q) = \frac{1}{2} KL(P \mid\mid M) + \frac{1}{2} KL(Q \mid\mid M) = \log 2
 $$
 
 ### 连续情形
@@ -370,24 +370,24 @@ $$
 Jensen-Shannon 散度在连续情形下定义为：
 
 $$
-JS(P \mid \mid Q) = \frac{1}{2} KL(P \mid \mid M) + \frac{1}{2} KL(Q \mid \mid M)
+JS(P \mid\mid Q) = \frac{1}{2} KL(P \mid\mid M) + \frac{1}{2} KL(Q \mid\mid M)
 $$
 
 其中 KL 散度采用积分形式，故
 
 $$
-JS(P \mid \mid Q) = \frac{1}{2} \int_{\mathbb{R}^d} p(x) \log \frac{p(x)}{m(x)} dx + \frac{1}{2} \int_{\mathbb{R}^d} q(x) \log \frac{q(x)}{m(x)} dx
+JS(P \mid\mid Q) = \frac{1}{2} \int_{\mathbb{R}^d} p(x) \log \frac{p(x)}{m(x)} dx + \frac{1}{2} \int_{\mathbb{R}^d} q(x) \log \frac{q(x)}{m(x)} dx
 $$
 
 > **直观理解**：与离散情形完全相同——JS 散度衡量的是：若用混合模型 $M$ 统一编码来自 $P$ 或 $Q$ 的数据（各占一半可能），所付出的平均额外比特数。
-> - 若 $p(x)$ 高而 $m(x)$ 低（如 $P$ 与 $Q$ 分离），则 $KL(P \mid \mid M)$ 大，JS大。
+> - 若 $p(x)$ 高而 $m(x)$ 低（如 $P$ 与 $Q$ 分离），则 $KL(P \mid\mid M)$ 大，JS大。
 > - 若两分布重叠良好，则 $m(x)$ 接近 $p(x)$ 和 $q(x)$，KL 项小，JS 也小。
 
 JS 散度在连续情形下**保持所有关键性质**：
-- **对称性**：$JS(P \mid \mid Q) = JS(Q \mid \mid P)$；KL 散度不满足。
-- **零值条件**：$JS(P \mid \mid Q) = 0 \iff p(x) = q(x)$；KL 散度也满足此性质。
-- **有界性**：$0 \leq JS(P \mid \mid Q) \leq \log 2$；
-- 当 $supp(p) \cap supp(q) = \emptyset$（如人脸 vs 猫图像分布在不相交流形上），则 $JS(P \mid \mid Q) = log2$
+- **对称性**：$JS(P \mid\mid Q) = JS(Q \mid\mid P)$；KL 散度不满足。
+- **零值条件**：$JS(P \mid\mid Q) = 0 \iff p(x) = q(x)$；KL 散度也满足此性质。
+- **有界性**：$0 \leq JS(P \mid\mid Q) \leq \log 2$；
+- 当 $supp(p) \cap supp(q) = \emptyset$（如人脸 vs 猫图像分布在不相交流形上），则 $JS(P \mid\mid Q) = log2$
 
 > “人脸分布 $P$ 与猫分布 $Q$ 的支撑集不相交” 意味着：
 > 在 $\mathbb{R}^{30000}$ 中，不存在任何一个区域（无论多小），既可能包含真实人脸图像，又可能包含真实猫图像。
@@ -548,7 +548,7 @@ $$
 - 当两个分布的支撑集（support）互不相交时，JS 散度恒等于其最大值：
 
 $$
-JS(P_{\text{data}} \mid \mid P_g) = \log 2
+JS(P_{\text{data}} \mid\mid P_g) = \log 2
 $$
 
 - 此时，生成器接收到的梯度几乎为零，即发生梯度消失（vanishing gradient）。
@@ -571,7 +571,7 @@ $$
 - 训练时通常以 1:1 的比例混合真实样本与生成样本，相当于假设两类先验概率相等（$p(y=1) = p(y=0) = 0.5$）；
 - 在此设定下，最大化上述目标函数等价于用最大似然估计学习后验概率 $p(y=1 \mid \boldsymbol{x})$；
 - 将最优判别器代入后，可严格推导出生成器最小化的是 JS 散度；
- 
+
 因此，JS 散度并非 GAN 框架的必然结果，而是由“交叉熵损失 + 概率输出 + 1:1 采样”这一具体实现所决定的。
 
 Goodfellow 等人选择 $\log D$ 和 $\log (1 - D)$ 是因为：
@@ -594,7 +594,7 @@ Goodfellow 等人选择 $\log D$ 和 $\log (1 - D)$ 是因为：
 
 - 真实数据分布 $P_{\text{data}}$ 和生成分布 $P_g$ 都集中在低维流形上；
 - 这两个流形几乎必然互不相交（即使视觉上很像）；
-- 此时 $JS(P_{\text{data}} \mid \mid P_g) = \log 2$ （常数）；
+- 此时 $JS(P_{\text{data}} \mid\mid P_g) = \log 2$ （常数）；
 - 导致 生成器梯度为零 → 无法学习（梯度消失）；
 - 同时，判别器很容易“过强”，把生成器彻底压制，导致模式崩溃（只生成少数几种样本）。
 
@@ -640,7 +640,7 @@ WGAN 的关键洞见是：换一个更好的“距离”来衡量两个分布的
 
 真实分布 $P$ 定义在 $n = 3$ 个点上：
 
-| 点                   | 位置 $\boldsymbol{x} \in \mathbb{R}^{2}$ | 质量 $p_i$ | 
+| 点                   | 位置 $\boldsymbol{x} \in \mathbb{R}^{2}$ | 质量 $p_i$ |
 |----------------------|------------------------------------------|------------|
 | $\boldsymbol{x}_1$   | $(0,0)$                                  | $0.2$      |
 | $\boldsymbol{x}_2$   | $(2,2)$                                  | $0.5$      |
@@ -650,7 +650,7 @@ WGAN 的关键洞见是：换一个更好的“距离”来衡量两个分布的
 
 生成分布 $Q$ 定义在 $m = 4$ 个点上：
 
-| 点                   | 位置 $\boldsymbol{y} \in \mathbb{R}^{2}$ | 质量 $q_j$ | 
+| 点                   | 位置 $\boldsymbol{y} \in \mathbb{R}^{2}$ | 质量 $q_j$ |
 |----------------------|------------------------------------------|------------|
 | $\boldsymbol{y}_1$   | $(0.5,0.5)$                              | $0.1$      |
 | $\boldsymbol{y}_2$   | $(1,1)$                                  | $0.3$      |
@@ -830,3 +830,187 @@ $$
 ![figure2](wasserstein-distance.png)
 <div style="text-align: center;"><em>Wasserstein 距离 离散 vs 连续</em></div>
 
+
+## WGAN 实践层面 (4.4)
+
+### 理论
+
+- 真实分布 $P_{\text{data}}$ ：定义在整个图像空间（$\mathbb{R}^{30000}$）上的**连续**概率分布；
+- 生成分布 $P_g$：由生成器 $G$ 和先验噪声 $\boldsymbol{z} \sim p_{\boldsymbol{z}}$ 诱导出的分布，通常也没有解析密度函数；
+
+所以，$W_1(P_{\text{data}},P_{g})$ 这个理论量无法直接计算。
+
+### 实践
+
+- 我们只有：
+    - 从 $P_{\text{data}}$ 采样得到的**真实数据** $\boldsymbol{x}_1, \boldsymbol{x}_2, \dots$ （例如 100 万张真人脸图像）
+    - 从 $P_g$ 采样得到的**生成数据** $\boldsymbol{y}_1, \boldsymbol{y}_2, \dots$ （例如 $G$ 生成的 200 万张假人脸图像）
+- 于是，我们用经验分布（empirical distribution） 来近似真实分布和生成分布：
+    - $\hat{P}_{\text{data}}$：100万张真人脸图像，每张的概率质量是 $\frac{1}{1 \times 10^6}$
+    - $\hat{P}_g$：200万张假人脸图像，每张的概率质量是 $\frac{1}{2 \times 10^6}$
+- 这就**回到了离散情形**（忘掉 $P_{\text{data}}$ 和 $P_g$ ，注意力转向 $\hat{P}_{\text{data}}$ 和 $\hat{P}_g$，这是两个**具体的、离散的**分布）
+    - $\Pi(\hat{P}_{\text{data}},\hat{P}_g)$ 是 $(1 \times 10^6) \times (2 \times 10^6)$ 的运输矩阵的**集合**；
+    - $W_1(\hat{P}_{\text{data}},\hat{P}_g)$ 就是经典的 Earth Mover’s Distance (EMD)
+
+也就是说，实际训练中，我们用有限样本构造经验分布 $\hat{P}\_{\text{data}}$ 和 $\hat{P}\_g$；虽然无法计算真实的 $W\_1(P\_{\text{data}}, P\_g)$ ，但 $W\_1(\hat{P}\_{\text{data}}, \hat{P}\_g)$ 提供了一个可优化且梯度稳定的训练目标。
+
+### 使用 KR 对偶避免直接计算 EMD
+
+虽然我们的目标已转向 $\hat{P}_{\text{data}}$ 和 $\hat{P}_g$ 这两个具体的、离散的分布，理论上可以精确计算 EMD，但计算精确 EMD 的复杂度是 $O(n^3 \log n)$，不可扩展。
+
+因此 Wasserstein GAN (WGAN) 使用了KR 对偶公式（Kantorovich-Rubinstein 对偶公式）：
+
+- 请来一位**地形测量员**，他可以给空间中每个点 $\boldsymbol{x}$ 赋予一个“高度” $f(\boldsymbol{x})$；但有个限制，地形不能太陡峭——任意两点的高度差不能超过它们之间的距离，即 $\text{坡度} \leq 1$，这叫做**1-Lipschitz 条件**：
+
+$$
+|f(\boldsymbol{x}) - f(\boldsymbol{y})| \leq \mid\mid \boldsymbol{x} - \boldsymbol{y} \mid\mid
+$$
+
+- 注意是**空间中任意两个点都必须满足 1-Lipschitz 条件**，不管它来自 $\hat{P}\_{\text{data}}$ 还是 $\hat{P}\_g$，亦或根本不来自 $\hat{P}\_{\text{data}}$ 或 $\hat{P}\_g$；换句话说，这个约束是全局的，适用于整个空间 $\mathbb{R}^{30000}$；
+- 在此限制下，他可以给 $\mathbb{R}^{30000}$ 每个点一个高度；因此，$\hat{P}_{\text{data}}$ （100 万个点）被塑造成一片地形；$\hat{P}_g$ （200 万个点）被塑造成另一片地形；
+- 这两个地形的平均高度分别记作 $\mathbb{E}_{\text{data}}[f]$ 和 $\mathbb{E}_g[f]$ ；其中 $\mathbb{E}$ 是期望算子，也就是加权平均——对所有点加权平均 $f$ 的值；
+
+两者之差（平均高度差）是 $\mathbb{E}_{\text{data}}[f] - \mathbb{E}_g[f]$；
+
+> 直觉：把 $\mathbb{R}^{30000}$  想象成二维平面，加上高度，构成三维立体空间。
+>
+> - 如果两片点云（$\hat{P}\_{\text{data}}$ 和 $\hat{P}\_g$）离得很远，$f$ 在 1-Lipschitz 条件的限制之下，也可以让两片点云之间形成很大落差，因为距离远就允许高度差大，即它们的平均高度差 $\mathbb{E}\_{\text{data}}[f] - \mathbb{E}\_g[f]$ 可以很大。换句话说，1-Lipschitz 允许两点间高度差最多等于它们的距离；如果两片点云整体分离很远（例如一个是另一个的平移，平移向量长度为 $D$），那么存在合法的 $f$（如沿分离方向的线性函数），使得平均高度差达到 $D$，即 $\mathbb{E}\_{\text{data}}[f] - \mathbb{E}\_g[f] = D$；
+> - 相反，如果两片点云离得很近，在 1-Lipschitz 条件的限制之下，无论 $f$ 如何选择，两片点云之间的落差都不会太大，因为距离近不允许高度差大，即它们的平均高度差 $\mathbb{E}_{\text{data}}[f] - \mathbb{E}_g[f]$ 很小；
+
+这就是 **KR 对偶公式的惊人结论**：1-Wasserstein 距离 $=$ 所有合法地形中最大的平均高度差，数学表达就是：
+
+$$
+W\_1(\hat{P}\_{\text{data}}, \hat{P}\_g) = \sup\_{||f||\_L \leq 1} \left( \mathbb{E}\_{\text{data}}[f] - \mathbb{E}\_g[f] \right)
+$$
+
+其中，
+
+- $\sup$ 表示‌**supremum（上确界）**；
+- $||f||\_L = \sup\_{\boldsymbol{x} \neq \boldsymbol{y}} \frac{|f(\boldsymbol{x}) - f(\boldsymbol{y})|}{||\boldsymbol{x} - \boldsymbol{y}||}$；
+- $||f||\_L \leq 1$ 表示 $f$ 满足 1-Lipschitz 条件；
+
+注意，平均高度差 $\mathbb{E}\_{\text{data}}[f] - \mathbb{E}\_g[f]$ 没有加绝对值，所以它本身可正可负。但$W\_1(\hat{P}\_{\text{data}}, \hat{P}\_g)$ 是对称的，可以选择 $f^\prime(\boldsymbol{x}) = -f(\boldsymbol{x})$ 调换正负（若 $f(\boldsymbol{x})$ 满足 1-Lipschitz 条件，则 $f^\prime(\boldsymbol{x})$ 也满足）；$\sup$（即上确界）会自动取到最大正值。
+
+### 判别器——众里寻他千百度
+
+使用 KR 对偶公式之后，问题转化为：寻找一个函数 $f$，并通过样本估计两个期望（即两片点云的平均“高度”）。如何构造这样的 $f$ 呢？
+
+回顾 $f$ 的作用：给定任意输入$\boldsymbol{x}$（无论是真实图像还是生成图像），输出一个实值“高度” $f(\boldsymbol{x})$。显然，$f$ 应具有可学习的参数，记为 $f_{\boldsymbol{\phi}}$ ；这不就是一个神经网络吗？所以自然地，用神经网络来参数化 $f_{\boldsymbol{\phi}}$。
+
+于是，在对抗训练中：
+
+- 训练 $f_{\boldsymbol{\phi}}$：最大化 $\hat{P}_{\text{data}}$ 和 $\hat{P}_g$ 的高度差——同时强制 $f$ 是 1-Lipschitz（比如用梯度惩罚，见下文）；
+- 训练 $G_{\boldsymbol{\theta}}$：最小化 $\hat{P}_{\text{data}}$ 和 $\hat{P}_g$ 的高度差（努力让生成样本的平均高度接近真实样本）；
+
+**众里寻他千百度，蓦然回首，$f$ 竟是判别器!**
+
+只是，此“判别器”已非彼判别器：
+
+- 它不再试图判断图像“真 or 假”，而是评估其“高 or 低”；
+- 它的输出**不是概率值**（如 0.9 表示很真），**而是一个无界的实值分数**；
+- 它的优化目标不再是交叉熵或 JS 散度，而是Wasserstein 距离的对偶形式——最大平均高度差。
+
+因此，更准确地说：$f$ 是传统判别器的“升维形态”——从二分类器蜕变为受 1-Lipschitz 约束的**连续评分函数**，**下文把判别器叫做critic**，以强调其角色变化！
+
+WGAN 的真正突破不在于“计算 Wasserstein 距离”，而在于：
+
+- 利用 KR 对偶将一个不可导、不可扩展的组合优化问题（EMD）转化为一个连续、可微、可通过神经网络优化的极小极大问题；
+- 即使在 $P_{\text{data}}$ 与 $P_g$ 支集不重叠时（如早期生成器很差），critic 仍能提供有意义的梯度方向，避免了传统 GAN 的“梯度消失”问题。
+
+## WGAN 的训练技巧与 Lipschitz 约束实现 (4.5)
+
+前面我们要求判别器（critic）函数 $f$ 必须满足 1-Lipschitz 条件，即：
+
+- 任意两点的高度差 $\leq$ 它们的距离
+- 等价于：地形的坡度不能超过 1
+
+但问题是：**神经网络天生不知道这个规则**！它可能画出悬崖峭壁（梯度极大）或平地突起（梯度不连续），违反 1-Lipschitz 约束。
+
+WGAN 原始论文方法是**权重裁剪（Weight Clipping）**，强行把神经网络的所有权重限制在 $[−0.01,0.01]$ 之间。结果：网络能力被严重阉割，训练不稳定，甚至学不会复杂地形。
+
+现在的主流解决方案是**梯度惩罚（Gradient Penalty, WGAN-GP）**：既然 1-Lipschitz 要求梯度（即坡度）的范数 $\leq$ 1，那我们就直接检查坡度！具体做法：
+
+- Critic（即判别器 $f$）的训练目标是：最大化高度差 $\mathbb{E}\_{\text{data}}[f] - \mathbb{E}\_g[f]$，也就是最小化 $-(\mathbb{E}\_{\text{data}}[f] - \mathbb{E}\_g[f])$；
+
+- 构造新的目标函数：
+
+$$
+Loss\_{\boldsymbol{\phi}} = -(\mathbb{E}\_{\text{data}}[f\_{\boldsymbol{\phi}}] - \mathbb{E}\_g[f\_{\boldsymbol{\phi}}]) + \text{GradientPenalty}
+$$
+
+- Critic（即判别器 $f$）的训练目标变成最小化 $Loss\_{\boldsymbol{\phi}}$；其中 $Loss$ 的未知参数 $\boldsymbol{\phi}$ 就是 $f$ 的未知参数；
+
+我们在新的目标函数中引入了 $\text{GradientPenalty}$；训练过程中，想办法做到：
+
+- 越违反 1-Lipschitz 约束，$\text{GradientPenalty}$ 越大，损失就越大；
+- 越符合 1-Lipschitz 约束，$\text{GradientPenalty}$ 越小，损失就越小；
+
+这就把一个硬性约束（$||f||\_L \leq 1$）转化为一个软性惩罚项，通过 loss 的增减引导网络自动满足约束。
+
+如何设计 $\text{GradientPenalty}$ ，使得**越违反 1-Lipschitz 约束，其值越大；反之越小**呢？
+
+本质上，1-Lipschitz 约束就是：任意两点的高度差 $\leq$ 它们的距离。把生成样本（一片点云）抽象成一个点 $\boldsymbol{s}$，把真实样本（另一片点云）抽象成另一个点 $\boldsymbol{r}$；把它们抽象成一维，放在 $x$ 轴上，并使用 $y$ 轴表示它们的高度。
+
+优秀的 $f$ 会让它们的高度差最大，即**高度差等于它们之间的距离**；也就是，线段 $\boldsymbol{s}$ → $\boldsymbol{r}$ 的斜率恰好等于 1。
+
+![figure3](gradient-penalty.png)
+<div style="text-align: center;"><em>Gradient Penalty</em></div>
+
+此时 $f$ 够优秀吗？不一定。因为 1-Lipschitz 要求**任意**两点的高度差都小于等于它们之间的距离，上面只是 $\boldsymbol{s}$ 和 $\boldsymbol{r}$ 这两点满足。假如 $\boldsymbol{s}$ 和 $\boldsymbol{r}$ 之间还有一个点 $\boldsymbol{t}$，使得线段 $\boldsymbol{s}$ → $\boldsymbol{t}$ 的斜率很大，而$\boldsymbol{t}$ → $\boldsymbol{r}$ 的斜率很小，$f$ 依然很糟糕！
+
+假如 $\boldsymbol{t}$ 刚好在线段 $\boldsymbol{s}$ → $\boldsymbol{r}$ 上，即线段 $\boldsymbol{s}$ → $\boldsymbol{t}$ 和 $\boldsymbol{t}$ → $\boldsymbol{r}$ 的斜率都为 1，依然可能存在其它点 $\boldsymbol{t}^\prime$ 使得线段 $\boldsymbol{s}$ → $\boldsymbol{t}^\prime$ 的斜率很大，而$\boldsymbol{t}^\prime$ → $\boldsymbol{r}$ 的斜率很小。
+
+所以，理想情况下，$\boldsymbol{s}$ 和 $\boldsymbol{r}$ 之间的所有点都在线段 $\boldsymbol{s}$ → $\boldsymbol{r}$ 上！或者说，$\boldsymbol{s}$ 和 $\boldsymbol{r}$ 之间的所有点附近的斜率（即所有点的梯度）都为 1；大于 1 或者小于 1，都应该使 $Loss$ 值变大，即都应该产生一个正的 $\text{GradientPenalty}$！
+
+> 注：梯度小于 1 并不违反 1-Lipschitz 约束，但会导致高度差无法达到最大值，所以也得到惩罚。
+> 注：现实中，两片点云之间，无法存在一个函数使得**所有点对之间的高度差都等于距离**（两两配对连成线段，它们的斜率基本不可能全为 1）；所以，上述“所有点梯度为 1”只是帮助我们建立直觉，并不严谨。
+
+这就是 Gradient Penalty 的核心思想。下面正式描述它：
+
+- 在真实样本（$\boldsymbol{x} \sim \hat{P}_{\text{data}}$）和生成样本（$\boldsymbol{y} \sim \hat{P}_g$）之间随机插值（每一对点 $(\boldsymbol{x},\boldsymbol{y})$ 连线上随机取一个插值点），得到一批“中间点”（当然不可能枚举所有点，那是无限多的），记为 $\hat{\boldsymbol{x}}$（它表示一个**随机变量**，每次采样得到一个点）：
+
+$$
+\hat{\boldsymbol{x}} = \epsilon \boldsymbol{x} + (1 - \epsilon) \boldsymbol{y}, \quad \boldsymbol{x} \sim \hat{P}_{\text{data}}, \boldsymbol{y} \sim \hat{P}_g, \epsilon \sim \text{Uniform}(0,1)
+$$
+
+- 逐一看这些“中间点”，点 $\hat{\boldsymbol{x}}$ 产生的惩罚是：$\lambda \cdot (|| \nabla f_{\boldsymbol{\phi}}(\hat{\boldsymbol{x}}) || - 1)^2$
+    - $\lambda > 0$ 是一个 hyperparameter，控制惩罚强度，通常设为 10；
+    - $|| \nabla f_{\boldsymbol{\phi}}(\hat{\boldsymbol{x}}) ||$ 是点 $\hat{\boldsymbol{x}}$ 处的梯度（即 $\hat{\boldsymbol{x}}$ 处的切线的斜率）；
+    - 当梯度为 1，就没有惩罚；
+
+- 计算总惩罚（$\mathbb{E}$ 表示加权平均；因为所有中间点的权重相同，所以就是所有中间点的惩罚的平均值）：
+
+$$
+\text{GradientPenalty} = \lambda \cdot \mathbb{E}\_{\hat{\boldsymbol{x}}}[(|| \nabla f\_{\boldsymbol{\phi}}(\hat{\boldsymbol{x}}) || - 1)^2]
+$$
+
+- 损失函数
+
+$$
+Loss\_{\boldsymbol{\phi}} = -(\mathbb{E}\_{\text{data}}[f\_{\boldsymbol{\phi}}] - \mathbb{E}\_g[f\_{\boldsymbol{\phi}}]) + \lambda \cdot \mathbb{E}\_{\hat{\boldsymbol{x}}}[(|| \nabla f\_{\boldsymbol{\phi}}(\hat{\boldsymbol{x}}) || - 1)^2]
+$$
+
+Critic（即判别器）就是神经网络 $f$，其训练目标是最小化损失函数 $Loss\_{\boldsymbol{\phi}}$。
+
+## WGAN 的限制与缺点 (4.6)
+
+- 计算开销大（尤其 WGAN-Gradient-Penalty）
+- 对 critic 架构敏感（因为WGAN 要求 critic 是 1-Lipschitz 函数）
+- 超参数 $\lambda$ 敏感（WGAN-Gradient-Penalty 特有）
+- 理论假设 vs 实践差距
+    - WGAN 的理论保证依赖于 critic 全局满足 1-Lipschitz；
+    - 但 WGAN-GP 只在 随机采样的插值点上施加局部约束，无法保证全局 Lipschitz；
+    - 因此，WGAN-GP 并不能严格实现 Wasserstein 距离，只是一个启发式近似；
+    - 在某些病态分布上，仍可能出现 critic 梯度爆炸或 loss 异常。
+
+所以，GAN 还有很多变体与优化，DCGAN, StyleGAN, BigGAN 等等。
+
+# 小结 (5)
+
+在本章中，我们介绍了生成对抗网络（GAN）——一种通过“生成器”与“判别器”相互对抗来学习生成逼真数据的模型。
+
+虽然原始 GAN 概念优美，但在实践中常面临训练不稳定、梯度消失等问题。
+
+为此，我们进一步学习了 WGAN（Wasserstein GAN），它通过使用 Wasserstein 距离替代传统概率散度，并引入 Lipschitz 约束（如梯度惩罚），显著提升了训练的稳定性，还让损失函数具备了实际意义，可用于监控训练进程。
+
+自 GAN 提出以来，研究者们已提出了大量改进方案，例如通过谱归一化（Spectral Normalization）、新型损失函数、条件生成结构等，不断推动生成质量、多样性和训练效率的提升。这些变体构成了丰富而活跃的生成模型生态。
