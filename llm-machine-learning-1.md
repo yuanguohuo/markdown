@@ -126,7 +126,7 @@ $$
 在选定一次函数且无bias的情况下，模型的好坏完全取决于唯一参数$w$。机器学习（训练）的过程，就是找到一个最优的$w$，使得通过模型计算出来的结果和真实结果最接近；
 
 ![figure2](loss-1.png)
-<div style="text-align: center;"><em>图2: 损失</em></div>
+<div style="text-align: center;"><em>图2: 预测值vs真实值</em></div>
 
 显然，$w=0.1$比$w=0.6$的损失要小！如何衡量模型计算出来的结果和真实结果是否接近呢？
 
@@ -280,9 +280,9 @@ $$
 $$
 \begin{aligned}
 \\\\
-& w^1 = w^0 - \eta \frac{\partial L}{\partial w}\big|\_{w=w^0,b=b^0} \\\\
+w^1 & = w^0 - \eta \frac{\partial L}{\partial w}\big\rvert_{w=w^0,b=b^0} \\\\
 \\\\
-& b^1 = b^0 - \eta \frac{\partial L}{\partial b}\big|\_{w=w^0,b=b^0} \\\\
+b^1 & = b^0 - \eta \frac{\partial L}{\partial b}\big\rvert_{w=w^0,b=b^0} \\\\
 \\\\
 \end{aligned}
 $$
@@ -392,6 +392,51 @@ Iter:2070000: dw = -0.0000, db = 0.0001, w = 0.1375, b = -6.6562, L = 688.5762
 Iter:2080000: dw = -0.0000, db = 0.0000, w = 0.1375, b = -6.6562, L = 688.5762
 ```
 
+等价 pytorch 代码
+
+```python
+import torch
+
+train_data_ios = torch.tensor([
+    142.54, 128.72, 92.60, 86.85, 76.27, 70.23,
+    57.16, 44.77, 87.35, 165.04, 84.55, 155.75,
+    291.75, 244.00, 220.88, 136.73, 132.40, 118.35,
+    125.60, 150.15, 157.85, 98.25, 114.89, 122.69,
+])
+
+train_data_await = torch.tensor([
+    5.34, 4.44, 5.55, 6.05, 5.66, 5.94,
+    6.18, 6.34, 7.67, 26.19, 7.82, 26.00,
+    34.55, 30.65, 29.51, 7.22, 7.52, 7.54,
+    5.92, 7.42, 7.13, 5.95, 5.04, 5.67,
+])
+
+def loss_f(t: torch.Tensor) -> torch.Tensor:
+    predict = t[0] * train_data_ios + t[1]
+    return ((predict - train_data_await) ** 2).sum()
+
+lr = 1e-6
+max_iters = 10000000
+p = torch.tensor([5000.0, 100.0], requires_grad=True)
+
+for i in range(max_iters):
+    if p.grad is not None:
+        p.grad.zero_()
+
+    loss = loss_f(p)
+    loss.backward()
+
+    if (i % 10000 == 0 or i == max_iters - 1):
+        print(f'Iter {i:8d}: dw = {p.grad[0]:.4f}, db = {p.grad[1]:.4f}, w = {p[0]:.4f}, b = {p[1]:.4f}, L = {loss:.4f}')
+
+    if abs(p.grad[0]) < 1e-10 and abs(p.grad[1]) < 1e-4:
+        break
+
+    with torch.no_grad():
+        p -= lr * p.grad
+```
+
+
 ### 向量写法 (3.3.3)
 
 约定小写字母表示标量（数字），如$a, b$。黑体小写字母表示列向量，如$\boldsymbol{a}, \boldsymbol{b}, \boldsymbol{\theta}$；要表示行向量，需要转置，如$\boldsymbol{a}^\top, \boldsymbol{b}^\top, \boldsymbol{\theta}^\top$。黑体大写字母表示矩阵，例如$\boldsymbol{W}, \boldsymbol{Q}, \boldsymbol{K}$。
@@ -425,7 +470,7 @@ $$
 
 其中$\boldsymbol{g}$就是梯度（gradient）。数学上就是，二维空间中（即曲面上）某点处的各个维度上的偏导数。
 
-**本质上，梯度$\boldsymbol{g}^0$是从$\boldsymbol{\theta}^0$到更优点的一个矢量（方向是反的，即从更优点指向$\boldsymbol{\theta}^0$）**。要往更优点行进，首先要把方向颠倒过来，即乘以一个负数（$-\eta$），行进的距离多少取决于$\eta$。所以，更优点$\boldsymbol{\theta}^1 = \boldsymbol{\theta}^0 + (-\eta \boldsymbol{g}^0)$。
+**本质上，梯度$\boldsymbol{g}^0$是从$\boldsymbol{\theta}^0$到更优点的一个矢量（方向是反的，即从更优点指向$\boldsymbol{\theta}^0$）**。要往更优点行进，首先要把方向颠倒过来，即乘以一个负数（$-\eta$），行进的距离多少取决于$\eta$和矢量的长度。所以，更优点$\boldsymbol{\theta}^1 = \boldsymbol{\theta}^0 + (-\eta \boldsymbol{g}^0)$。
 
 **负梯度指向下降最快的方向，这是梯度下降法的核心**。为什么说**下降最快**呢？因为**各个维度都是下降的**。一个维度上如何确保下降，见第2.3节的函数图像演示。这里只是推广到多维。
 
@@ -502,16 +547,7 @@ $$
 \end{bmatrix}
 $$
 
-其中$\boldsymbol{g}$就是梯度（gradient）。数学上就是，多维空间中某点处的各个维度上的偏导数。
-
-**本质上，梯度$\boldsymbol{g}^0$是从$\boldsymbol{\theta}^0$到更优点的一个矢量（方向是反的，即从更优点指向$\boldsymbol{\theta}^0$）**。要往更优点行进，首先要把方向颠倒过来，即乘以一个负数（$-\eta$），行进的距离多少取决于$\eta$。所以，更优点$\boldsymbol{\theta}^1 = \boldsymbol{\theta}^0 + (-\eta \boldsymbol{g}^0)$。
-
-**负梯度指向下降最快的方向，这是梯度下降法的核心**。说**下降最快**，是因为**各个维度都是下降的**。
-梯度（gradient）用梯度算子$\boldsymbol{\nabla}$（读作nabla）表示:
-
-$$
-\boldsymbol{g}^0 = \boldsymbol{\nabla}L(\boldsymbol{\theta}^0)
-$$
+梯度$\boldsymbol{g}$就是多维空间中的某个点在各个维度上的偏导数。
 
 - 参数向量（多个参数构成一个向量）的更新过程：
 
@@ -646,14 +682,14 @@ $$
 为什么$\sigma(b+wx)$可以模拟$h_{a,b}(x)$呢？$w$为正数，
 
 - 当x为负无穷：$\sigma(b+wx) = 0$ 
-- 当x为负正穷：$\sigma(b+wx) = 1$ 
+- 当x为正无穷：$\sigma(b+wx) = 1$
 
 并且：
 
 - 调整$w$可以改变曲线的陡峭程度，即$h_{a,b}(x)$中$a$和$b$的距离；
-- 调整$b$可以平易曲线，即$h_{a,b}(x)$中$a$和$b$的位置；
+- 调整$b$可以平移曲线，即$h_{a,b}(x)$中$a$和$b$的位置；
 
-所以，这两者近似等价：
+它们都有2个参数。所以，这两者近似等价：
 
 - 使用$c \cdot h_{a,b}(x)$构造模型函数，然后去学习参数$c$、$a$和$b$；
 - 使用$c \cdot \sigma(b+wx)$构造模型函数，然后去学习参数$c$、$w$和$b$；
@@ -851,7 +887,7 @@ $$
 f(x_1,x_2) = b + \sum\limits_{i=1}^m c_i \cdot \sigma(b_{i}+w_{i,1}x_{1}+w_{i,2}x_{2})
 $$
 
-其中，$b,c_1,b_1,w_{1,1},w_{1,2},c_2,b_2,w_{2,1},w_{2,2},\cdots,c_m,b_m,w_{m,1},w_{m,2}$为待定参数。
+其中 $b,c_1,b_1,w_{1,1},w_{1,2},c_2,b_2,w_{2,1},w_{2,2},\cdots,c_m,b_m,w_{m,1},w_{m,2}$为待定参数。
 
 定义损失函数：
 
@@ -866,10 +902,10 @@ $$
 
 # 一般形式 (6)
 
-推广到$j$个输入特征，函数模型：
+推广到$t$个输入特征，$m$个激活函数，则模型为：
 
 $$
-f(x_1,x_2,\cdots,x_j) = b + \sum\limits_{i=1}^m c_i \cdot \sigma(b_{i} + \sum\limits_{j=1}^t w_{i,j}x_{j})
+f(x_1,x_2,\cdots,x_t) = b + \sum\limits_{i=1}^m c_i \cdot \sigma(b_{i} + \sum\limits_{j=1}^t w_{i,j}x_{j})
 $$
 
 例如，3个输入特征（$j \in \{1,\cdots,3\}$），4个激活函数（$i \in \{1,\cdots,4\}$）
