@@ -9,16 +9,6 @@ categories: daos
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 简介 
 
 过去几十年来，计算机系统一直采用如图1所示的内存-存储层级结构。这个层级结构利用了“局部性原理”，即把频繁访问的数据放在离CPU更近的地方，以提高性能。

@@ -9,16 +9,6 @@ Linux中用户态程序总是preemptible的，内核使用clock tick中断用户
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 三种Preemption模式 (1)
 
 编译linux kernel 3.19.8，配置的时候（`make menuconfig`），关于preemption模式（Processor type and features ---> Preemption Model），有3个选项：

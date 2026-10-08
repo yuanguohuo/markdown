@@ -15,17 +15,6 @@ categories: llm
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
-
 # 问题设定 (1)
 
 现有一些HDD磁盘的性能数据(通过`iostat`采集)，如下所示：

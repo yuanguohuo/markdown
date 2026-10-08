@@ -9,17 +9,6 @@ categories: c++
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
-
 # 查找一个类型T (1)
 
 假设有一个类型列表：`char`, `short`, `int`, `float`, `double`；要找`float`在这个序列中的位置(从0开始，结果应该是3)：

@@ -9,17 +9,6 @@ categories: llm
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
-
 # 输入 (1)
 
 假设当前上下文是“humpty dumpty sat on”，我们要预测下一个单词。有以下输入：

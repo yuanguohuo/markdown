@@ -9,16 +9,6 @@ categories: llm
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 张量 tensor (1)
 
 在前一篇[PyTorch自动求导](https://www.yuanguohuo.com/2025/12/03/llm-machine-learning-7/)的第5小节（例3）中，引入了一个极小的神经网络作为例子，如图1：

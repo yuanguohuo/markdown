@@ -9,17 +9,6 @@ PyTorch 自动求导：从计算图、链式法则到三个 backward 规则。
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
-
 # 计算图 (1)
 
 PyTorch 会记录下来 tensor 的计算过程，也就是保留计算图（有向无环图DAG, Directed Acyclic Graph）。
@@ -134,7 +123,7 @@ Backward 从 $\frac{\partial y}{\partial y} = 1$ 出发，反向走 DAG。每个
 ![figure2](dag-backward-1.png)
 <div style="text-align: center;"><em>图2:DAG-backward</em></div>
 
-> 注：其实中间 tensor 的累加值不是写进 .grad，而是放在一块临时缓冲区，转发后释放。本图为了示意 backward 过程，把缓冲区里的值画成了框内 .grad。
+> 注：其实中间 tensor 的累加值不是写进 .grad，而是放在一块临时缓冲区，转发后释放。本图为了示意 backward 过程，把缓冲区里的值画成了框内 .grad，仅为了方便，不够严谨。
 
 规则：
 
@@ -149,7 +138,7 @@ p_{k+1}(u,v) & = p_{k+2}(u,v) + q_{k+2}(u,v)
 \end{aligned}
 $$
 
-其中 $C_1 C_2 \dots C_k$ 是 backward 过程中累积的常量乘积，记为 $C$，就是**流入梯度**，被原样复制给上游的两个输入 tensor。则：
+其中 $C_1 C_2 \dots C_k$ 是 backward 过程中累积的常量乘积，记为 $C$，就是**流入梯度**，被原样复制给上游的两个输入 tensor。也就是：
 
 $$
 \begin{aligned}
@@ -170,16 +159,9 @@ $$
 
 而 $\frac{\partial{y}}{\partial{u}} = \frac{\partial{t_3}}{\partial{u}} + \frac{\partial{t_5}}{\partial{u}}$ 正是图上从 `add(t3,t5)` 射出的两条标着 1 的红箭头。
 
-注意：从公式看，应该有4条箭头（4个$C \cdot 1$），但为什么只有2条呢？因为 `add` 节点自己只干一件事——把 $C$ 原样复制给两个输入，它不知道 $u$ 和 $v$ 的存在，所以在它这一层永远只有 2 条箭头。关于 $u$ 和 $v$ 的拆分发生在两条箭头继续往上走之后，由各分支自己的链条完成；公式是把这"往上走"的过程一步压缩写完了，才显得有 4 项（假如有3个参数则有6项，4个参数会有8项，以此类推）。
+注意：从公式看，应该有4条箭头（上面公式中出现4个$C \cdot 1$），但为什么只有2条呢？因为 `add` 节点自己只干一件事——把 $C$ 原样复制给两个输入，它不知道 $u$ 和 $v$ 的存在，所以在它这一层永远只有 2 条箭头。关于 $u$ 和 $v$ 的拆分发生在两条箭头继续往上走之后，由各分支自己的链条完成；公式是把这"往上走"的过程一步压缩写完了，才显得有 4 项（假如有3个参数则有6项，4个参数会有8项，以此类推）。
 
 这有一个好处，`add` 根本不用关心两个分支是否和什么参数有关，而只关心“局部”；`add` 射出的每条箭头（共 2 条）都是一个"载体"，载着 $C$ 往上走；走到分支链条里，才裂成"给$u$的一份和给$v$的一份"：$t3$ 链裂成$u$的 $150$和$v$的$0$（$t3$和$v$无关），$t5$链裂成$u$的$21$和$v$的$15$。
-
-或许，应该把参数抽象，写成如下形式，对应`add`的两个箭头：
-
-$$
-\frac{\partial{y}}{\partial{\boldsymbol{\theta}}} = C \cdot 1 \cdot \frac{\partial{p_{k+2}(\boldsymbol{\theta})}}{\partial{\boldsymbol{\theta}}} +
-                                                    C \cdot 1 \cdot \frac{\partial{q_{k+2}(\boldsymbol{\theta})}}{\partial{\boldsymbol{\theta}}}
-$$
 
 本质上就是$(C(f(x) + g(x)))^{\prime} = C \cdot 1 \cdot f^{\prime}(x) + C \cdot 1 \cdot g^{\prime}(x)$。至于 $f^{\prime}(x)$ 和 $g^{\prime}(x)$ 包含哪些参数，在后续 backward 的过程中逐层分发，本节点只处理“局部导数”。
 
@@ -193,7 +175,14 @@ $$
 
 至于 $f$ 和 $g$ 有哪些参数（可能是上一层子运算`add`，`mul`等，也可能是最终的模型参数），要到 $f$ 和 $g$ 各自求导时处理。这里假如 $f$ 包含**模型参数** $\theta_1$ 和 $\theta_2$ 而不包含 $\theta_3$，那么沿着 $f$ 一层层backward，最终贡献给 $\theta_1$ 和 $\theta_2$ 一个梯度值，而贡献给 $\theta_3$ 的为 $0$；同理，沿着 $g$ 一层层backward，最终贡献给 $\theta_2$ 和 $\theta_3$ 一个梯度值，而贡献给 $\theta_1$ 的为 $0$；最终 $\theta_2$ 的梯度值是二者的和。
 
-**注意：**`add` **求导时，根本不关心** $f$ **和** $g$ **各自包含哪些模型参数**。以 $f$ 为例，可以理解为它包含所有的模型参数 $\theta_1$，$\theta_2$ 和 $\theta_3$，但它实际上不包含参数 $\theta_3$————这没有关系，沿着 $f$ 求导，最终不贡献给 $\theta_3$ 梯度值（或者认为贡献$0$）。**上式中** $f^{\prime}$ **和** $g^{\prime}$ **没有写参数，就是表示同时对所有模型参数取梯度，等式逐分量（逐参数）成立**。
+**强调：**`add` **求导时，根本不关心** $f$ **和** $g$ **各自包含哪些模型参数**。以 $f$ 为例，可以理解为它包含所有的模型参数 $\theta_1$，$\theta_2$ 和 $\theta_3$，但它实际上不包含参数 $\theta_3$——这没有关系，沿着 $f$ 求导，最终不贡献给 $\theta_3$ 梯度值（或者认为贡献$0$）。**上式中** $f^{\prime}$ **和** $g^{\prime}$ **没有写参数，就是表示同时对所有模型参数取梯度，等式逐分量（逐参数）成立**。
+
+由此可见，应该把参数抽象化，写成如下形式，对应`add`的两个箭头：
+
+$$
+\frac{\partial{y}}{\partial{\boldsymbol{\theta}}} = C \cdot 1 \cdot \frac{\partial{p_{k+2}(\boldsymbol{\theta})}}{\partial{\boldsymbol{\theta}}} +
+                                                    C \cdot 1 \cdot \frac{\partial{q_{k+2}(\boldsymbol{\theta})}}{\partial{\boldsymbol{\theta}}}
+$$
 
 2. **mul**：流入梯度 $\times$ “系数”
 
@@ -206,32 +195,34 @@ p_{k+1}(\boldsymbol{\theta}) & = p_{k+2}(\boldsymbol{\theta}) \cdot q_{k+2}(\bol
 \end{aligned}
 $$
 
-其中 $C_1 C_2 \dots C_k$ 是 backward 过程中累积的常量乘积，记为 $C$，就是流入梯度。则
+其中 $C_1 C_2 \dots C_k$ 是 backward 过程中累积的常量乘积，记为 $C$，就是流入梯度。根据前面推导加法的经验，直接把参数抽象化，对应`mul`射出的两个箭头：
 
 $$
-\frac{\partial{y}}{\partial{\boldsymbol{\theta}}}  = C \cdot q_{k+2} \frac{\partial{p_{k+2}}(\boldsymbol{\theta})}{\partial{\boldsymbol{\theta}}} +
-                                                     C \cdot p_{k+2} \frac{\partial{q_{k+2}}(\boldsymbol{\theta})}{\partial{\boldsymbol{\theta}}}
+\frac{\partial{y}}{\partial{\boldsymbol{\theta}}}  = C \cdot q_{k+2} \cdot \frac{\partial{p_{k+2}}(\boldsymbol{\theta})}{\partial{\boldsymbol{\theta}}} +
+                                                     C \cdot p_{k+2} \cdot \frac{\partial{q_{k+2}}(\boldsymbol{\theta})}{\partial{\boldsymbol{\theta}}}
 $$
-
-本质上就是$(Cf(x)g(x))^{\prime} = C \cdot g(x) \cdot f^{\prime}(x) + C \cdot f(x) \cdot g^{\prime}(x)$。至于 $f^{\prime}(x)$ 和 $g^{\prime}(x)$ 包含哪些参数，在后续 backward 的过程中逐层分发，本节点只处理“局部导数”。
-
-多个模型参数的情况，以 $\theta_1$，$\theta_2$ 和 $\theta_3$ 3 个为例：
-
-$$
-(Cf(\theta_1,\theta_2)g(\theta_2,\theta_3))^{\prime} = C \cdot g \cdot f^{\prime} + C \cdot f \cdot g^{\prime}
-$$
-
-对于 `mul` 而言，它的参数（注意区别于模型的参数）就是 $f$ 和 $g$；当前 `mul` 可表示成 $h(f,g) = C \cdot f \cdot g$，对 $f$ 的偏导数是 $C \cdot g$，对 $g$ 的偏导数是 $C \cdot f$。这里可以看出，**对于** `mul`，**前向计算时要把** $f$ **和** $g$ **两个输入因子（槽）的值保存下来，backward 时，直接可用**；而对于 `add` 则不需要。
-
-至于 $f$ 和 $g$ 有哪些参数（可能是上一层子运算`add`，`mul`等，也可能是最终的模型参数），要到 $f$ 和 $g$ 各自求导时处理。这里假如 $f$ 包含**模型参数** $\theta_1$ 和 $\theta_2$ 而不包含 $\theta_3$，那么沿着 $f$ 一层层backward，最终贡献给 $\theta_1$ 和 $\theta_2$ 一个梯度值，而贡献给 $\theta_3$ 的为 $0$；同理，沿着 $g$ 一层层backward，最终贡献给 $\theta_2$ 和 $\theta_3$ 一个梯度值，而贡献给 $\theta_1$ 的为 $0$；最终 $\theta_2$ 的梯度值是二者的和。
-
-**注意：** `mul` **求导时，根本不关心** $f$ **和** $g$ **各自包含哪些模型参数**。以 $f$ 为例，可以理解为它包含所有的模型参数 $\theta_1$，$\theta_2$ 和 $\theta_3$，但它实际上不包含参数 $\theta_3$————这没有关系，沿着 $f$ 求导，最终不贡献给 $\theta_3$ 梯度值（或者认为贡献$0$）。**上式中** $f$，$g$，$f^{\prime}$ **和** $g^{\prime}$ **均没写参数**：$f$，$g$ **取前向值**；$f^{\prime}$，$g^{\prime}$ **表示同时对所有模型参数取梯度，等式逐分量（逐参数）成立**。
 
 计算对分支 $p_{k+2}(u,v)$ 的贡献时，把$q_{k+2}(u,v)$ 看做系数；相反，计算对分支 $q_{k+2}(u,v)$ 的贡献时，把$p_{k+2}(u,v)$ 看做系数。并且，和`add`相同，`mul`也不知道且不关心每个分支上有哪些参数，而只关心“局部”。
 
 以图2中`mul(t1,u)`为例：对$u$的贡献是$2 \times t1$（2是流入梯度，t1是系数）；对t1的贡献是$2 \times u$（2是流入梯度，$u$是系数）。
 
-**注意：对于二次方，同样成立**。看`mul(u,u)`：把左边$u$看做系数右边$u$看做变量，贡献$10 \times u$；把右边$u$看做系数左边$u$看做变量，还是贡献$10 \times u$，所以`mul(u,u)`对$u$贡献了两个$50$。 $10u + 10u = 10 \times 2u$，即$\text{流入梯度} \times (u^2)^{\prime}$，和微分公式对得上。
+**注意：对于二次方，同样成立**。看`mul(u,u)`：把左边$u$看做系数右边$u$看做变量，贡献$10 \times u$；把右边$u$看做系数左边$u$看做变量，还是贡献$10 \times u$，所以`mul(u,u)`对$u$贡献了两个$50$。 $10u + 10u = 10 \times 2u$，即$\text{流入梯度} \times (u^2)^{\prime} = \text{流入梯度} \times 2 \cdot u$，和微分公式对得上。
+
+乘法规则本质上就是$(Cf(x)g(x))^{\prime} = C \cdot g(x) \cdot f^{\prime}(x) + C \cdot f(x) \cdot g^{\prime}(x)$。至于 $f^{\prime}(x)$ 和 $g^{\prime}(x)$ 包含哪些参数，在后续 backward 的过程中逐层分发，本节点只处理“局部导数”。
+
+关于后续逐层分发，以 $\theta_1$，$\theta_2$ 和 $\theta_3$ 3 个为例：
+
+$$
+(Cf(\theta_1,\theta_2)g(\theta_2,\theta_3))^{\prime} = C \cdot g \cdot f^{\prime} + C \cdot f \cdot g^{\prime}
+$$
+
+对于 `mul` 而言，它的参数（注意区别于模型的参数）就是 $f$ 和 $g$；当前 `mul` 可表示成 $h(f,g) = C \cdot f \cdot g$，对 $f$ 的偏导数是 $C \cdot g$，对 $g$ 的偏导数是 $C \cdot f$。
+
+> **提醒：可以看出，对于** `mul`，**前向计算时要把** $f$ **和** $g$ **两个输入因子（槽）的值保存下来，这样，backward 时就直接可用**；而对于 `add` 则不需要。
+
+至于 $f$ 和 $g$ 有哪些参数（可能是上一层子运算`add`，`mul`等，也可能是最终的模型参数），要到 $f$ 和 $g$ 各自求导时处理。这里假如 $f$ 包含**模型参数** $\theta_1$ 和 $\theta_2$ 而不包含 $\theta_3$，那么沿着 $f$ 一层层backward，最终贡献给 $\theta_1$ 和 $\theta_2$ 一个梯度值，而贡献给 $\theta_3$ 的为 $0$；同理，沿着 $g$ 一层层backward，最终贡献给 $\theta_2$ 和 $\theta_3$ 一个梯度值，而贡献给 $\theta_1$ 的为 $0$；最终 $\theta_2$ 的梯度值是二者的和。
+
+**强调：** `mul` **求导时，根本不关心** $f$ **和** $g$ **各自包含哪些模型参数**。以 $f$ 为例，可以理解为它包含所有的模型参数 $\theta_1$，$\theta_2$ 和 $\theta_3$，但它实际上不包含参数 $\theta_3$——这没有关系，沿着 $f$ 求导，最终不贡献给 $\theta_3$ 梯度值（或者认为贡献$0$）。**上式中** $f$，$g$，$f^{\prime}$ **和** $g^{\prime}$ **均没写参数**：$f$，$g$ **取前向值**；$f^{\prime}$，$g^{\prime}$ **表示同时对所有模型参数取梯度，等式逐分量（逐参数）成立**。
 
 3. **分叉tensor**：所有入边贡献累加
 
@@ -245,7 +236,7 @@ $$
 
 落地到图2：$u$ 有 4 条入边，贡献分别为 $50$、$50$、$50$、$21$，累加结果是 $171$；$v$ 有 3 条入边，贡献分别为 $28$、$28$、$15$，结果是 $71$。
 
-**这条规则并非叶子专属**：中间 tensor 上同样发生累加。比如另有一张图 `m = mul(a,a)`（a 是叶子），m 被 `mul(m,2)` 和 `mul(m,5)` 两个分支消费，则`m`收到$2$和$5$两笔贡献，累加得 $\text{grad}(m) = 7$（`retain_grad()` 可见），再以 $7 \times 2a$ 继续下传。中间 tensor 与叶子的区别在"存"不在"加"：中间 tensor 把累加值传给自己的输入，传完即弃（`.grad` 默认为 `None`）；叶子是终点，累加值落盘进 `.grad`。
+**这条规则并非叶子专属**：中间 tensor 上同样发生累加。比如另有一张图 `m = mul(a,a)`（a 是叶子），m 被 `mul(m,2)` 和 `mul(m,5)` 两个分支消费，则`m`收到$2$和$5$两笔贡献，累加得 $\text{grad}(m) = 7$（`retain_grad()` 可见），再以 $7 \times 2a$ 继续下传。**中间 tensor 与叶子 tensor 在求导规则上是统一的，它们的区别在于导数值的存储**：中间 tensor 把累加值传给自己的输入，传完即弃（`.grad` 默认为 `None`，图2不严谨）；叶子是终点，累加值落盘进 `.grad`。
 
 注：叶子的累加是 `+=`，反复调用 `backward()` 会继续叠加，所以训练循环里要先 `zero_grad()`。
 
@@ -268,7 +259,7 @@ $$
 
 > 注：
 > - `mul` 为什么必须存 forward 的两个因子：局部导数是“另一因子”（**一个是另一个的系数**），而因子从乘积里反推不出来；`add` 的局部导数恒为 1，什么都不用存。这是**最小信息原则**，也是训练比推理费显存的原因（saved tensors）。
-> - 图2 中间 tensor 的 `.grad`（10、2、1、3……）是教学值：PyTorch 默认**不保留**非叶子的 `.grad`（为 `None`，需 `retain_grad()` 才留）；backward 真正传递的是红箭头上的梯度。
+> - 图2 中间 tensor 的 `.grad`（10、2、1、3……）不严谨：PyTorch 默认**不保留**中间 tensor 的 `.grad`（需 `retain_grad()` 才留）；backward 真正传递的是红箭头上的梯度。
 
 ## 用 PyTorch 对账 (3.3)
 

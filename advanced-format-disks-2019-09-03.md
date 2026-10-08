@@ -9,16 +9,6 @@ categories: disk
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 4K扇区 (1)
 
 磁盘的高级格式（Advanced Format）使用4K作为扇区的大小（至少第一代Advanced Format就是指4K扇区）。传统磁盘的扇区大小是512B。有什么问题呢？这得从扇区的结构说起：磁盘上的扇区不是一个接一个紧密排列的，相邻的扇区之间有一个间隙（gap），并且每个扇区前面有一个sync字段和一个address mark字段，接着才是我们所知的512B数据（data），后面还有一个纠错码ECC（error correcting code）。并且：

@@ -9,16 +9,6 @@ LevelDB中Table是一个比较复杂的结构。Block负责有序kv-pair的存�
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # Block (1)
 
 ## Block的结构 (1.1)

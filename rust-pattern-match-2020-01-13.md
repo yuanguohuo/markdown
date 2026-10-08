@@ -9,16 +9,6 @@ Rust中match随处可见，但是其中有一些细节值得注意：被match的
 
 <!-- more --> 
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 ** 测试类 **
 
 ```rs

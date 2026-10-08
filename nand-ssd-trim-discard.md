@@ -11,17 +11,6 @@ SSD 的写入性能并非一成不变。一块全新的 SSD 顺序写入可以�
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
-
 # NAND 闪存的物理结构 (1)
 
 NAND 闪存有两个核心概念：

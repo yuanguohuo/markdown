@@ -9,16 +9,6 @@ categories: linux
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 问题的由来 (1)
 
 在linux中，在block device上可以虚拟出新的block device（例如software RAID使用md，LVM2使用dm）；新的block device上还可以再虚拟出更上层的block device；这样，就形成一个block device stack。除最底层之外，每层block device不真正处理bio，而是split、合并或修改bio，然后发给下一层的block device。

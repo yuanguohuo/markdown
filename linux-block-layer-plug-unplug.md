@@ -9,16 +9,6 @@ Block层的请求在device的queue里会发生reorder与merge以提高效率，�
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 增大merge的机会 (1)
 
 通常，减小per-request开销（例如HDD的寻道时间）的有效方式是merge：把几个小的request合并成一个连续的、大的request。每个device都会有一个（对于single-queue而言）queue；IO scheduler在这个queue上做各种reorder和merge，以提高效率。这里的merge有一些缺点：

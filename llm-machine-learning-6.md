@@ -9,16 +9,6 @@ categories: llm
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 问题描述 (1)
 
 目标是通过机器学习方法生成“真实人脸图像”。当然，生成的图像不太可能是真实人脸图像，这里“真实”指具有自然摄影风格的人脸（区别于卡通、素描或抽象艺术等非写实风格），图像尺寸为 $100 \times 100$ 的 RGB 图像。

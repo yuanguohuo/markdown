@@ -9,16 +9,6 @@ categories: llm
 
 <!-- more -->
 
-<script type="text/x-mathjax-config">
-MathJax.Hub.Config({
-tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
-});
-</script>
-
-<script type="text/javascript" async
-  src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML">
-</script>
-
 # 说明 (0)
 
 MultiHead Attention是[Self Attention](https://www.yuanguohuo.com/2025/03/07/llm-self-attention/)的推广，或者说后者是前者的特例。
