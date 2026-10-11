@@ -289,6 +289,7 @@ $$
 $$
 \begin{aligned}
 & \frac{\partial \mathcal{L}(\boldsymbol{w}, b)}{\partial w\_h} = \frac{1}{N} \sum\_{i=1}^N (p\_{i1} - t\_{i1}) x\_{ih} \\\\
+\\\\
 & \frac{\partial \mathcal{L}(\boldsymbol{w}, b)}{\partial b} = \frac{1}{N} \sum\_{i=1}^N (p\_{i1} - t\_{i1})
 \end{aligned}
 $$
@@ -298,11 +299,12 @@ $$
 $$
 \begin{aligned}
 & w\_{h}^{n+1} = w\_{h}^n - \eta \cdot \frac{1}{N} \sum\_{i=1}^N (p\_{i1} - t\_{i1}) x\_{ih} \\\\
+\\\\
 & b^{n+1}     = b^n     - \eta \cdot \frac{1}{N} \sum\_{i=1}^N (p\_{i1} - t\_{i1})
 \end{aligned}
 $$
 
-其中 $\eta$ 是 learning rate；
+其中 $\eta$ 是 learning rate。
 
 参数更新是什么意思呢？直观解释是，误差驱动学习。主要看 $p\_{i1} - t\_{i1}$，它表示模型预测 $\boldsymbol{x}\_i$ 属于类别1的概率 $p\_{i1}$ 与真实属于类别1的概率 $t\_{i1}$ 之间的误差。误差越大，参数调整幅度越大。这体现了误差反向传播的核心思想：模型通过“哪里错了、错得多严重”来指导自身修正。
 
@@ -535,9 +537,22 @@ $$
 $$
 \begin{aligned}
 & \frac{\partial \mathcal{L}(\boldsymbol{\theta})}{\partial w\_{kh}} = \frac{1}{N} \sum\_{i=1}^N (p\_{ik} - t\_{ik}) x\_{ih}  \\\\
+\\\\
 & \frac{\partial \mathcal{L}(\boldsymbol{\theta})}{\partial b\_k} = \frac{1}{N} \sum\_{i=1}^N (p\_{ik} - t\_{ik})
 \end{aligned}
 $$
+
+梯度下降：
+
+$$
+\begin{aligned}
+& w\_{kh}^{n+1} = w\_{kh}^n - \eta \cdot \frac{1}{N} \sum\_{i=1}^N (p\_{ik} - t\_{ik}) x\_{ih} \\\\
+\\\\
+& b\_k^{n+1}    = b\_k^n    - \eta \cdot \frac{1}{N} \sum\_{i=1}^N (p\_{ik} - t\_{ik})
+\end{aligned}
+$$
+
+其中 $\eta$ 是 learning rate。
 
 # 逻辑回归的局限性 (6)
 
