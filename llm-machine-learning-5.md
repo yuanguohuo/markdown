@@ -36,7 +36,7 @@ categories: llm
 
 # 针对图像识别的优化 (3)
 
-## Receptive Field (3.1)
+## 优化1：Receptive Field (3.1)
 
 人类对于图像的识别，是基于一些关键特征（critical patterns）的，例如根据眼睛、鼻子、嘴巴、耳朵等特征判断图像是一只猫。机器也是这样。
 
@@ -66,7 +66,7 @@ categories: llm
 - receptive field 高度重叠：把一个 receptive field 往右或者往下移动一个距离，就得到一个新的 receptive field；**移动的距离叫 stride（hyper-parameter）**；stride 一般不会设置太大，通常1或2（否则可能跳过了 critical pattern）；若 stride 大于 1，移到边缘可能需要 padding；
 - 按上述方式，扫过图片所有区域；
 
-## Parameter Sharing (3.2)
+## 优化2：Parameter Sharing (3.2)
 
 同样的 pattern 可能出现在图片的不同位置：例如猫的眼睛，可能出现在图片左上角，也可能出现在右下角……
 
@@ -97,11 +97,11 @@ categories: llm
 
 ## 卷积神经网络 (3.3)
 
-在 fully connected network 中，每个 neuron 的输入都是整张图片，故弹性最大。容易证明，只要每个 neuron “观察”一部分，把其它权重都设置为0，就**退化成** 带优化1的版本（只“观察” receptive field）。所以，前者是后者的超集，后者的弹性小于前者。
+在 fully connected network 中，每个 neuron 的输入都是整张图片，故弹性最大。容易证明：只要让 fully connected network 的每个 neuron 只“观察”图片的一部分（即 receptive field），就**特化**成带优化1的版本（如何实现只观察一部分呢？不用更改 fully connected network 的网络结构，只需把其它部分对应的权重都设置为0即可）。所以，前者是后者的超集，后者的弹性小于前者。
 
-在 receptive field 的基础上，进一步限制弹性：学习的时候，要保持参数共享的约束，不能随意调整。
+在 receptive field 的基础上，进一步限制弹性（学习的时候，要保持参数共享的约束，不能随意调整），就**特化**成带优化2的版本。
 
-Receptive field 与 parameter sharing 合起来，就构成 **convolutional layer**；包含 convolutional layer 的网络，就是 convolutional neural network（CNN, 卷积神经网络）。
+优化1和优化2（Receptive field 与 parameter sharing）合起来，就构成 **convolutional layer**。包含 **convolutional layer** 的网络，就是 **convolutional neural network（CNN, 卷积神经网络）**。
 
 ![figure7](convolutional-layer.png)
 <div style="text-align: center;"><em>Convolutional Layer</em></div>
@@ -112,9 +112,12 @@ Receptive field 与 parameter sharing 合起来，就构成 **convolutional laye
 
 本节是解释 CNN 的另一个版本。可以不看上面的版本，直接看这一节。不过，个人觉得上面的版本更偏向于训练角度；本节的版本更偏向于推理。
 
+![figure8](convolve-over-image.png)
+<div style="text-align: center;"><em>Convolve Over Image</em></div>
+
 卷积神经网络包含一组 **filter**，就是被多个 neuron 共享的参数（见前文）；一个 filter 可以派生出多个 neuron （但不以 neuron 为第一视角；提 neuron 的主要目的是为了理解两个版本是等价的）。
 
-一个 filter 以固定步长（stride）在输入图像上滑动，遍历所有局部区域，从每个区域提取 pattern。这一过程称为 “对输入图像进行卷积”（convolve over the input image），也是“卷积神经网络”名称的由来。（对应之前的版本：一个 filter 派生出多个 neuron，每个 neuron “观察”一个 receptive field）。
+一个 filter 以固定步长（stride）在输入图像上滑动，遍历所有局部区域，从每个区域提取 pattern。这一过程称为**对输入图像进行卷积（convolve over the input image）**，也是**卷积神经网络**名称的由来。（对应之前的版本：一个 filter 派生出多个 neuron，每个 neuron “观察”一个 receptive field）。
 
 如何提取？从计算公式看，和 neuron 的计算一模一样。
 
@@ -130,14 +133,14 @@ $$
 
 下面假设 channel 为 1，stride 为 1，且忽略 $b$，说明 filter 如何工作。
 
-![figure8](feature-map-1.png)
+![figure9](feature-map-1.png)
 <div style="text-align: center;"><em>Feature</em></div>
 
 怎么理解“抓取” pattern呢？图中 filter1 的对角线都是 1，其它是 -1；所以它遇到对角线都是 1 的 pattern，输出就最大。图中，左上角和左下角就是这种 pattern。
 
-对每个 filter 重复如上操作：
+对每个 filter 重复如上操作（同样假设 channel 为 1，stride 为 1，且忽略 $b$）：
 
-![figure9](feature-map-2.png)
+![figure10](feature-map-2.png)
 <div style="text-align: center;"><em>Feature Map</em></div>
 
 假如有 64 个 filter （观察每个 receptive field 的 neuron 是 64 个），就会产生 64 组数据。这其实又构成一张新的“图像”，**叫做 feature map**，它有 64 个 channel。
@@ -157,12 +160,27 @@ $$
 
 # 完整的CNN (5)
 
-既然原始图像经过一个 convolutional layer 输出的是另一个“图像”（64 channel 的 feature map），很容易想到把多个 convolutional layers 叠起来。显然，第 $L+1$ 层的 filter 的 channel 数，等于第 $L$ 层的 feature map 的 channel 数（例如64）。
+既然原始图像经过一个 convolutional layer 输出的是另一个“图像”（64 channel 的 feature map），很容易想到把多个 convolutional layers 叠起来。显然，第 $L$ 层输出的 feature map 的 channel 数（例如 64），就是第 $L+1$ 层的各个 filter 的 channel 数。如下图所示：
 
-![figure10](multi-convolution-layers.png)
-<div style="text-align: center;"><em>卷积神经网络</em></div>
+![figure11](layers-and-feature-maps.png)
+<div style="text-align: center;"><em>两个 convolutional layer 的衔接</em></div>
+
+- 输入层是 $100 \times 100 \times 3$ 的图像；
+- 第 1 个 convolutional layer：
+    - 64 个 filter；
+    - stride 是 1 且 kernel size 是 $3 \times 3$，所以有 $98 \times 98$ 个 receptive field；
+    - 有 $98 \times 98 \times 64$ 个 neuron；
+    - 输出 $98 \times 98 \times 64$ 的 feature map（64 channel，每个 channel $98 \times 98$）；
+- 第 2 个 convolutional layer：
+    - 128 个 filter；
+    - stride 是 1 且 kernel size 是 $3 \times 3$，所以有 $96 \times 96$ 个 receptive field；
+    - 有 $96 \times 96 \times 128$ 个 neuron；
+    - 输出 $96 \times 96 \times 128$ 的 feature map（128 channel，每个 channel $96 \times 96$）；
 
 通常几个 convolutional layer 之后还会接一个 pooling 层。Pooling 就是把比较大的 feature map 变小。一张真实的图像，把它的奇数列和奇数行像素都去掉，图像大变成原来的 $\frac{1}{4}$，基本上还保留原来的形状。对于 feature map 也类似，过程是这样的：以 $N \times N$ 为一个单元（例如 $2 \times 2$），取每个单元内的最大值，就得到一张原 feature map 的 $\frac{1}{4}$ 的小 map，这个过程是 **max** pooling。类似的，也可以取平均数（mean pooling），或者几何平均数等。
+
+![figure12](multi-convolution-layers.png)
+<div style="text-align: center;"><em>完整的卷积神经网络</em></div>
 
 可以看出，pooling 层没有参数，相当于一个操作符。
 

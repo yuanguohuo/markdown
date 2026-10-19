@@ -1,7 +1,7 @@
 ---
 title: Self-Attention 
 date: 2025-03-07 20:30:40
-tags: [llm,ai]
+tags: [llm,attention]
 categories: llm
 ---
 
@@ -360,4 +360,4 @@ $$
 
 # 总结 (5)
 
-输出维度与输入一致，本例中输入$X$和输出$SelfAttentionOutput$都是$4 \times 512$的矩阵。对单词$x$而言，输入的是它的512维embedding向量，输出$SelfAttentionOutput_x$也是512维向量，$x \in [humpty, dumpty, sat, on]$。但是，**自注意力输出不是简单的词向量变换，而是一种语境增强的语义表示，为下游任务提供强大的上下文感知能力**。从后文我们将发现，Self Attention是[MultiHead Attention](https://www.yuanguohuo.com/2025/03/08/llm-multi-head-attenion/)的一个特例。
+输出维度与输入一致，本例中输入$X$和输出$SelfAttentionOutput$都是$4 \times 512$的矩阵。对单词$x$而言，输入的是它的512维embedding向量，输出$SelfAttentionOutput_x$也是512维向量，$x \in [humpty, dumpty, sat, on]$。但是，**自注意力输出不是简单的词向量变换，而是一种语境增强的语义表示，为下游任务提供强大的上下文感知能力**。从后文我们将发现，Self Attention是[MultiHead Attention](https://www.yuanguohuo.com/2025/03/08/llm-multi-head-attention/)的一个特例。
